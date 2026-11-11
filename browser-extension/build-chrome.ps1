@@ -1,6 +1,9 @@
 $ErrorActionPreference = "Stop"
 if (Test-Path dist-chrome) { Remove-Item -Recurse -Force dist-chrome }
-Copy-Item -Recurse cennik dist-chrome
+New-Item -ItemType Directory -Path dist-chrome | Out-Null
+foreach ($name in @("_locales", "icons", "lib", "content", "popup", "page", "background.js")) {
+  Copy-Item -Recurse -LiteralPath $name -Destination dist-chrome
+}
 Copy-Item manifest.chrome.json dist-chrome/manifest.json
 Copy-Item sw.js dist-chrome/sw.js
 $polyfill = '<script src="../lib/browser-polyfill.min.js"></script>'

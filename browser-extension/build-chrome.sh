@@ -1,7 +1,8 @@
 #!/bin/sh
 set -e
 rm -rf dist-chrome
-cp -r cennik dist-chrome
+mkdir dist-chrome
+cp -r _locales icons lib content popup page background.js dist-chrome/
 cp manifest.chrome.json dist-chrome/manifest.json
 cp sw.js dist-chrome/sw.js
 # Chrome-only: polyfill in popup/page (Firefox keeps native browser.*)
