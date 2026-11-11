@@ -9,3 +9,4 @@ frontend/web/node_modules/
 frontend/web/dist/
 backups/
 *.log
+deployed-version
