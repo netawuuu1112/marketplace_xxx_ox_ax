@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+<div class="screen" id="scr-main">
+  <div class="hdr">
+    <svg class="logo" viewBox="0 0 26 26" fill="none" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="7" fill="#2783DE"/><path d="M7 15.5 11 11l3 3 5-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="hdr-name" data-i18n="appName"></span>
+    <span class="hdr-count" id="count" hidden>0</span>
+    <span class="hdr-spacer"></span>
+    <button class="icon-btn" id="btn-pick" data-i18n-title="pickTitle" data-i18n-aria="pickAria">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M10.8 2.3a2 2 0 0 1 2.9 2.9l-1.4 1.4-2.9-2.9 1.4-1.4zM8.3 4.8l2.9 2.9-5.2 5.2c-.2.2-.5.4-.8.4l-1.9.4.4-1.9c0-.3.2-.6.4-.8l5.2-5.2z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-refresh" data-i18n-title="refreshPrices" data-i18n-aria="refreshPrices">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14 8.5a5.5 5.5 0 1 1-1.6-3.9M14 2.5v3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-page" data-i18n-title="openProductsPage" data-i18n-aria="openProductsPage">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M9.5 2.5h4v4M13.5 2.5 8.75 7.25M6.5 3.5H4A1.5 1.5 0 0 0 2.5 5v7A1.5 1.5 0 0 0 4 13.5h7a1.5 1.5 0 0 0 1.5-1.5V9.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <button class="icon-btn" id="btn-settings" data-i18n-title="settings" data-i18n-aria="settings">
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><circle cx="9" cy="9" r="2.2" stroke="currentColor" stroke-width="1.6"/><path d="M9 1.8v2M9 14.2v2M1.8 9h2M14.2 9h2M3.9 3.9l1.4 1.4M12.7 12.7l1.4 1.4M14.1 3.9l-1.4 1.4M5.3 12.7l-1.4 1.4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+  <div class="sub"><span class="dot-ok"></span><span id="sub-text">…</span></div>
+  <div class="list" id="list"></div>
+  <div class="empty" id="empty" hidden>
+    <svg viewBox="0 0 26 26" fill="none" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="7" fill="#E5F2FC"/><path d="M7 15.5 11 11l3 3 5-6" stroke="#2783DE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <b data-i18n="emptyTitle"></b>
+    <p data-i18n="emptyHint"></p>
+  </div>
+  <div class="addbar">
+    <input id="add-input" type="text" data-i18n-placeholder="addLinkPlaceholder" data-i18n-aria="addLinkAria">
+    <button id="add-btn" data-i18n="trackBtn"></button>
+  </div>
+</div>
+
+<div class="screen" id="scr-detail" hidden>
+  <div class="back-row">
+    <button class="back-btn" id="btn-back-detail">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2 4 7l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span data-i18n="allProducts"></span>
+    </button>
+    <span class="hdr-spacer"></span>
+    <button class="icon-btn" id="d-refresh" data-i18n-title="refreshOne" data-i18n-aria="refreshOne">
+      <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14 8.5a5.5 5.5 0 1 1-1.6-3.9M14 2.5v3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+  <div class="detail-body">
+    <div class="d-title" id="d-title"></div>
+    <div class="d-meta"><span class="chip" id="d-store"></span><span class="goal" id="d-added"></span></div>
+    <div class="d-price-row">
+      <span class="d-price" id="d-price"></span>
+      <span class="delta" id="d-delta"></span>
+    </div>
+    <div class="card">
+      <div class="target-row">
+        <div>
+          <div class="card-label" data-i18n="targetPrice"></div>
+          <div class="target-input-row">
+            <input id="d-target" type="number" min="0" step="any" data-i18n-placeholder="targetUnset">
+            <span class="target-cur" id="d-target-cur">₽</span>
+          </div>
+        </div>
+        <button class="target-edit" id="d-target-save" data-i18n="save"></button>
+      </div>
+      <div class="bar" id="d-bar-wrap" hidden><div id="d-bar"></div></div>
+      <div class="bar-note" id="d-bar-note" hidden></div>
+    </div>
+    <div class="card chart-wrap">
+      <div class="chart-head">
+        <span class="card-label" data-i18n="priceHistory"></span>
+        <span class="card-label" id="d-chart-note"></span>
+      </div>
+      <div id="d-chart"></div>
+      <div class="stats">
+        <div class="stat"><span data-i18n="min"></span><b id="d-min"></b></div>
+        <div class="stat"><span data-i18n="max"></span><b id="d-max"></b></div>
+        <div class="stat"><span data-i18n="avg"></span><b id="d-avg"></b></div>
+      </div>
+    </div>
+    <div class="err-note" id="d-error" hidden></div>
+    <div class="honest" id="d-honest" hidden>
+      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true"><circle cx="9" cy="9" r="7.2" fill="#46A171"/><path d="M5.8 9.2 8 11.4l4.2-4.6" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div><b id="d-honest-title"></b><p id="d-honest-text"></p></div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <button class="btn primary" id="d-open" data-i18n="openInStore"></button>
+    <button class="btn ghost" id="d-remove" data-i18n="untrack"></button>
+  </div>
+</div>
+
+<div class="screen" id="scr-settings" hidden>
+  <div class="back-row">
+    <button class="back-btn" id="btn-back-settings">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M9 2 4 7l5 5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span data-i18n="settings"></span>
+    </button>
+  </div>
+  <div class="set-body">
+    <div class="set-sec" data-i18n="notifSection"></div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="notifBrowserTitle"></b><span data-i18n="notifBrowserDesc"></span></div>
+      <button class="toggle" id="set-bnotif" data-i18n-aria="notifBrowserAria"></button>
+    </div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="notifDropTitle"></b><span data-i18n="notifDropDesc"></span></div>
+      <button class="toggle" id="set-drop" data-i18n-aria="notifDropAria"></button>
+    </div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="notifPctTitle"></b><span data-i18n="notifPctDesc"></span></div>
+      <select class="select" id="set-pct" data-i18n-aria="notifPctAria">
+        <option value="0" data-i18n="pctOff"></option>
+        <option value="5">5%</option>
+        <option value="10">10%</option>
+        <option value="15">15%</option>
+        <option value="20">20%</option>
+        <option value="30">30%</option>
+        <option value="50">50%</option>
+      </select>
+    </div>
+    <div class="tg-card">
+      <div class="tg-status" id="tg-status-row">
+        <span class="dot-ok" id="tg-dot" hidden></span>
+        <div><b id="tg-status"></b><br><span id="tg-substatus"></span></div>
+      </div>
+      <div class="tg-form">
+        <input id="tg-token" type="password" data-i18n-placeholder="tgTokenPlaceholder" data-i18n-aria="tgTokenAria">
+        <button id="tg-connect" data-i18n="tgConnect"></button>
+        <button id="tg-test" hidden data-i18n="tgTest"></button>
+      </div>
+      <div class="tg-note" id="tg-note" data-i18n="tgHelp"></div>
+    </div>
+    <div class="set-sec" data-i18n="checkSection"></div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="checkFreqTitle"></b><span data-i18n="checkFreqDesc"></span></div>
+      <select class="select" id="set-interval" data-i18n-aria="checkFreqAria">
+        <option value="60" data-i18n="interval1h"></option>
+        <option value="180" data-i18n="interval3h"></option>
+        <option value="360" data-i18n="interval6h"></option>
+        <option value="1440" data-i18n="interval1d"></option>
+      </select>
+    </div>
+    <div class="set-sec" data-i18n="themeSection"></div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="themeTitle"></b><span data-i18n="themeDesc"></span></div>
+      <select class="select" id="set-theme" data-i18n-aria="themeAria">
+        <option value="auto" data-i18n="themeAuto"></option>
+        <option value="light" data-i18n="themeLight"></option>
+        <option value="dark" data-i18n="themeDark"></option>
+      </select>
+    </div>
+    <div class="set-sec" data-i18n="dataSection"></div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="exportTitle"></b><span data-i18n="exportDesc"></span></div>
+      <button class="link-btn" id="btn-export" data-i18n="exportBtn"></button>
+    </div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="importTitle"></b><span data-i18n="importDesc"></span></div>
+      <input type="file" id="btn-import" accept=".json" hidden>
+      <button class="link-btn" id="btn-import-trigger" data-i18n="importBtn"></button>
+    </div>
+    <div class="tg-note" id="import-note" hidden></div>
+    <div class="row">
+      <div class="row-label"><b data-i18n="clearTitle"></b><span data-i18n="clearDesc"></span></div>
+      <button class="link-btn danger" id="btn-clear" data-i18n="clearBtn"></button>
+    </div>
+  </div>
+  <div class="set-foot"><span id="version"></span></div>
+</div>
+
+<script src="../lib/i18n.js"></script>
+<script src="popup.js"></script>
+</body>
+</html>
