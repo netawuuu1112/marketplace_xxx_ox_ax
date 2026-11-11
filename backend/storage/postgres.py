@@ -94,6 +94,19 @@ class PostgresDatabase(Database):
                 );
                 CREATE INDEX IF NOT EXISTS idx_notifications_user
                     ON notifications(user_id,created_at DESC);
+                CREATE TABLE IF NOT EXISTS ai_providers (
+                    name TEXT PRIMARY KEY,
+                    base_url TEXT NOT NULL,
+                    model_id TEXT NOT NULL,
+                    api_key_ciphertext TEXT NOT NULL,
+                    enabled BOOLEAN NOT NULL DEFAULT true,
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE TABLE IF NOT EXISTS ai_routes (
+                    kind TEXT PRIMARY KEY,
+                    provider_name TEXT NOT NULL REFERENCES ai_providers(name) ON DELETE CASCADE,
+                    model_id TEXT NOT NULL
+                );
             """)
 
     async def close(self) -> None:

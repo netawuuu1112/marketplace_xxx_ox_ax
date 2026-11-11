@@ -21,7 +21,7 @@ from pydantic import BaseModel
 
 import config
 from llm.providers import (LocalProvider, MistralProvider, MockProvider,
-                           OpenRouterProvider, ProviderError)
+                            OpenRouterProvider, OpenAICompatProvider, ProviderError)
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,12 @@ class LLMGateway:
             self._providers.append(MistralProvider(mistral_api_key, timeout))
         if api_key:
             self._providers.append(OpenRouterProvider(api_key, timeout))
+        self._static_providers = list(self._providers)
+        self._dynamic_providers: list = []
+        self._retired_providers: list = []
+        self._provider_signature: tuple = ()
+        self._routes: dict[str, str] = {}
+        self._refresh_lock = asyncio.Lock()
         # первый доступный — «основной» (для диагностики и тестов)
         self._provider = self._providers[0] if self._providers else None
         self._mock = MockProvider()
@@ -155,6 +161,7 @@ class LLMGateway:
         """Один структурный вызов: вернёт валидный schema-объект."""
         if kind not in TEXT_KINDS | {"vision"}:
             raise ValueError(f"неизвестный kind: {kind}")
+        await self.refresh_from_db()
         if self._provider is None and self._local is None:
             if config.DEMO_MODE:
                 return await self._mock.complete(model="mock", kind=kind,
@@ -178,8 +185,10 @@ class LLMGateway:
         if await self._db.budget_used(day) >= self._daily_limit:
             raise BudgetExceeded(self._daily_limit)
 
-        chain = TEXT_CHAINS[self._profile] if kind in TEXT_KINDS \
-            else VISION_CHAINS[self._profile]
+        chain = list(TEXT_CHAINS[self._profile] if kind in TEXT_KINDS
+                     else VISION_CHAINS[self._profile])
+        if kind in self._routes:
+            chain.insert(0, self._routes[kind])
         last_error: Exception | None = None
         deadline = time.monotonic() + config.STRUCTURED_MAX_SECONDS
         # бюджет списывается один раз на структурный вызов (не на каждую
@@ -211,6 +220,42 @@ class LLMGateway:
                                model, exc)
         logger.error("Все модели цепочки %s недоступны: %s", chain, last_error)
         raise ProviderError("LLM providers are unavailable") from last_error
+
+    async def refresh_from_db(self) -> None:
+        """Read admin configuration before a call so all entry points share routing."""
+        async with self._refresh_lock:
+            await self._load_dynamic_config()
+
+    async def _load_dynamic_config(self) -> None:
+        from storage.postgres import PostgresDatabase
+        if not isinstance(self._db, PostgresDatabase) or self._db._pool is None:
+            return
+        rows = await self._db.pool.fetch("""
+            SELECT name,base_url,model_id,api_key_ciphertext,enabled
+            FROM ai_providers ORDER BY name
+        """)
+        signature = tuple((r["name"], r["base_url"], r["model_id"],
+                           r["api_key_ciphertext"], r["enabled"]) for r in rows)
+        routes = await self._db.pool.fetch("SELECT kind,provider_name,model_id FROM ai_routes")
+        self._routes = {r["kind"]: f"{r['provider_name']}:{r['model_id']}" for r in routes}
+        if signature == self._provider_signature:
+            return
+        from ai_settings import cipher
+        active = [r for r in rows if r["enabled"]]
+        if active:
+            decryptor = cipher()
+            new = [OpenAICompatProvider(
+                decryptor.decrypt(r["api_key_ciphertext"].encode()).decode(),
+                r["base_url"], self._timeout, name=r["name"])
+                for r in active]
+        else:
+            new = []
+        old = self._dynamic_providers
+        self._dynamic_providers = new
+        self._providers = self._static_providers + new
+        self._provider = self._providers[0] if self._providers else None
+        self._provider_signature = signature
+        self._retired_providers.extend(old)
 
     def _resolve_provider(self, raw: str) -> tuple:
         """Модель 'mistral:mistral-small-latest' → (MistralProvider, модель).
@@ -248,7 +293,7 @@ class LLMGateway:
         }
 
     async def aclose(self) -> None:
-        for p in self._providers:
+        for p in self._providers + self._retired_providers:
             await p.aclose()
         if self._local is not None:
             await self._local.aclose()

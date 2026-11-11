@@ -30,6 +30,7 @@ import logging
 import os
 import time
 import base64
+import binascii
 from collections import defaultdict, deque
 from urllib.parse import parse_qsl
 
@@ -117,8 +118,19 @@ def _valid_web_session(token: str) -> bool:
             return False
         data = json.loads(base64.urlsafe_b64decode(payload + "=" * (-len(payload) % 4)))
         return data.get("sub") == "admin" and int(data.get("exp", 0)) > time.time()
-    except (ValueError, TypeError, json.JSONDecodeError):
+    except (ValueError, TypeError, binascii.Error):
         return False
+
+
+def _telegram_admin(request: web.Request) -> bool:
+    user_id = parse_init_data(request.headers.get("X-Telegram-Init-Data", ""), config.BOT_TOKEN)
+    raw = os.getenv("TELEGRAM_ADMIN_IDS", "")
+    return user_id is not None and str(user_id) in {x.strip() for x in raw.split(",") if x.strip()}
+
+
+def _require_admin(request: web.Request) -> None:
+    if not (_valid_web_session(request.cookies.get("mf_session", "")) or _telegram_admin(request)):
+        raise web.HTTPForbidden(text="Требуются права администратора")
 
 
 async def handle_login(request: web.Request) -> web.Response:
@@ -143,7 +155,8 @@ async def handle_login(request: web.Request) -> web.Response:
 
 async def handle_me(request: web.Request) -> web.Response:
     _resolve_user(request)
-    return web.json_response({"role": "super_admin" if _valid_web_session(request.cookies.get("mf_session", "")) else "user"})
+    admin = _valid_web_session(request.cookies.get("mf_session", "")) or _telegram_admin(request)
+    return web.json_response({"role": "super_admin" if admin else "user"})
 
 
 async def handle_logout(request: web.Request) -> web.Response:
@@ -369,6 +382,51 @@ async def handle_notifications(request: web.Request) -> web.Response:
     return web.json_response({"notifications": rows})
 
 
+async def handle_ai_providers(request: web.Request) -> web.Response:
+    from ai_settings import list_providers
+    _require_admin(request)
+    return web.json_response({"providers": await list_providers(_monitor_db(request))})
+
+
+async def handle_ai_provider_save(request: web.Request) -> web.Response:
+    from ai_settings import save_provider
+    _require_admin(request)
+    data = await request.json()
+    try:
+        await save_provider(_monitor_db(request), str(data.get("name", "")),
+                            str(data.get("base_url", "")), str(data.get("model_id", "")),
+                            str(data["api_key"]) if data.get("api_key") else None,
+                            bool(data.get("enabled", True)))
+    except (ValueError, RuntimeError) as exc:
+        raise web.HTTPBadRequest(text=str(exc))
+    return web.json_response({"ok": True})
+
+
+async def handle_ai_provider_delete(request: web.Request) -> web.Response:
+    from ai_settings import delete_provider
+    _require_admin(request)
+    await delete_provider(_monitor_db(request), request.match_info["name"])
+    return web.json_response({"ok": True})
+
+
+async def handle_ai_routes(request: web.Request) -> web.Response:
+    from ai_settings import list_routes
+    _require_admin(request)
+    return web.json_response({"routes": await list_routes(_monitor_db(request))})
+
+
+async def handle_ai_route_save(request: web.Request) -> web.Response:
+    from ai_settings import save_route
+    _require_admin(request)
+    data = await request.json()
+    try:
+        await save_route(_monitor_db(request), str(data.get("kind", "")),
+                         str(data.get("provider_name", "")), str(data.get("model_id", "")))
+    except ValueError as exc:
+        raise web.HTTPBadRequest(text=str(exc))
+    return web.json_response({"ok": True})
+
+
 @web.middleware
 async def _auth_middleware(request: web.Request, handler):
     if config.API_TOKEN and request.path != "/health":
@@ -465,6 +523,11 @@ def create_app(ctx: ApiContext) -> web.Application:
     app.router.add_delete("/api/watches/{watch_id:\\d+}", handle_delete_watch)
     app.router.add_get("/api/watches/{watch_id:\\d+}/history", handle_price_history)
     app.router.add_get("/api/notifications", handle_notifications)
+    app.router.add_get("/api/admin/ai/providers", handle_ai_providers)
+    app.router.add_put("/api/admin/ai/providers", handle_ai_provider_save)
+    app.router.add_delete("/api/admin/ai/providers/{name}", handle_ai_provider_delete)
+    app.router.add_get("/api/admin/ai/routes", handle_ai_routes)
+    app.router.add_put("/api/admin/ai/routes", handle_ai_route_save)
     app.router.add_get("/api/reviews", handle_reviews)
     app.router.add_get("/api/compare", handle_compare)
     app.router.add_get("/api/budget", handle_budget)

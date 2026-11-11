@@ -41,6 +41,47 @@ export async function currentUser(): Promise<boolean> {
   }
 }
 
+export async function myRole(): Promise<string> {
+  return (await getJson<{ role: string }>("/api/auth/me", {})).role;
+}
+
+export type AiProvider = { name: string; base_url: string; model_id: string; enabled: boolean };
+export type AiRoute = { kind: string; provider_name: string; model_id: string };
+
+async function adminRequest<T>(path: string, method: string, body?: unknown): Promise<T> {
+  const url = new URL(`${API}${path}`);
+  const { initData, userId } = launchInfo();
+  if (userId) url.searchParams.set("user_id", userId);
+  const response = await fetch(url.toString(), {
+    method,
+    headers: { ...(body ? { "Content-Type": "application/json" } : {}),
+      ...(initData ? { "X-Telegram-Init-Data": initData } : {}) },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()) as T;
+}
+
+export async function getAiProviders(): Promise<AiProvider[]> {
+  return (await adminRequest<{ providers: AiProvider[] }>("/api/admin/ai/providers", "GET")).providers;
+}
+
+export async function getAiRoutes(): Promise<AiRoute[]> {
+  return (await adminRequest<{ routes: AiRoute[] }>("/api/admin/ai/routes", "GET")).routes;
+}
+
+export async function saveAiProvider(provider: AiProvider & { api_key?: string }): Promise<void> {
+  await adminRequest("/api/admin/ai/providers", "PUT", provider);
+}
+
+export async function deleteAiProvider(name: string): Promise<void> {
+  await adminRequest(`/api/admin/ai/providers/${encodeURIComponent(name)}`, "DELETE");
+}
+
+export async function saveAiRoute(route: AiRoute): Promise<void> {
+  await adminRequest("/api/admin/ai/routes", "PUT", route);
+}
+
 export async function login(password: string): Promise<void> {
   const response = await fetch(`${API}/api/auth/login`, {
     method: "POST",

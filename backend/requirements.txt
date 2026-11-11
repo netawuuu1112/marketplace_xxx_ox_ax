@@ -1,5 +1,6 @@
 aiogram>=3.13
 asyncpg>=0.30
+cryptography>=45
 aiohttp>=3.10
 aiosqlite>=0.20
 pydantic>=2.9

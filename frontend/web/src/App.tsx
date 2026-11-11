@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { comparePrices, createWatch, currentUser, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, removeWatch, searchMarketplaces, searchProducts, watchHistory, writeFavorite } from "./api";
-import type { MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
+import { comparePrices, createWatch, currentUser, deleteAiProvider, getAiProviders, getAiRoutes, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, watchHistory, writeFavorite } from "./api";
+import type { AiProvider, AiRoute, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
 
 const SUGGESTIONS = [
@@ -19,6 +19,7 @@ type Screen =
   | { name: "favorites" }
   | { name: "watches" }
   | { name: "notifications" }
+  | { name: "admin_ai" }
   | { name: "settings" };
 
 function rub(n: number | null | undefined): string {
@@ -42,7 +43,9 @@ function Stars({ n }: { n: number }) {
 
 export default function App() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [role, setRole] = useState("user");
   useEffect(() => { currentUser().then(setAuthenticated); }, []);
+  useEffect(() => { if (authenticated) myRole().then(setRole).catch(() => {}); }, [authenticated]);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
   const [favorites, setFavorites] = useState<Product[]>([]);
   useEffect(() => { if (authenticated) listFavorites().then(setFavorites).catch(() => {}); }, [authenticated]);
@@ -71,7 +74,7 @@ export default function App() {
       <Header screen={screen} onBack={() => go({ name: "home" })} />
       <main className="content">
         {screen.name === "home" && (
-          <HomeScreen onOpen={(s) => go(s)} />
+          <HomeScreen onOpen={(s) => go(s)} admin={role === "super_admin"} />
         )}
         {screen.name === "results" && (
           <ResultsScreen
@@ -108,6 +111,7 @@ export default function App() {
         )}
         {screen.name === "watches" && <WatchesScreen />}
         {screen.name === "notifications" && <NotificationsScreen />}
+        {screen.name === "admin_ai" && <AiAdminScreen />}
         {screen.name === "settings" && <SettingsScreen />}
       </main>
       <TabBar
@@ -148,6 +152,7 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
     favorites: "Избранное",
     watches: "Мониторинг",
     notifications: "Уведомления",
+    admin_ai: "Настройки ИИ",
     settings: "Настройки",
   };
   const canBack = screen.name !== "home";
@@ -161,7 +166,7 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
 
 // ─────────────────────────── Home ─────────────────────────────────
 
-function HomeScreen({ onOpen }: { onOpen: (s: Screen) => void }) {
+function HomeScreen({ onOpen, admin }: { onOpen: (s: Screen) => void; admin: boolean }) {
   const [query, setQuery] = useState("");
   const [state, setState] = useState<"idle" | "busy">("idle");
   const [error, setError] = useState("");
@@ -216,6 +221,7 @@ function HomeScreen({ onOpen }: { onOpen: (s: Screen) => void }) {
         <MenuCard emoji="⭐" title="Избранное" desc="Сохранённые товары" onClick={() => onOpen({ name: "favorites" })} />
         <MenuCard emoji="📉" title="Мониторинг" desc="Проверки цен и история" onClick={() => onOpen({ name: "watches" })} />
         <MenuCard emoji="🔔" title="Уведомления" desc="Достигнутые пороги цен" onClick={() => onOpen({ name: "notifications" })} />
+        {admin && <MenuCard emoji="🧠" title="Настройки ИИ" desc="Провайдеры и модели по задачам" onClick={() => onOpen({ name: "admin_ai" })} />}
         <MenuCard emoji="⚙️" title="Настройки" desc="Профиль и лимиты запросов" onClick={() => onOpen({ name: "settings" })} />
       </div>
     </div>
@@ -534,6 +540,96 @@ function NotificationsScreen() {
       <h3>{item.title}</h3><p>{item.body}</p>
       <p className="hint">{new Date(item.created_at).toLocaleString("ru-RU")}</p>
     </article>)}
+  </div>;
+}
+
+const AI_BASE_URLS: Record<string, string> = {
+  aitunnel: "https://api.aitunnel.ru/v1",
+  openai: "https://api.openai.com/v1",
+  qwen: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  deepseek: "https://api.deepseek.com",
+  kimi: "",
+};
+
+const AI_TASKS = ["constraints", "review", "rank", "arbiter", "freeform", "vision"];
+
+function AiAdminScreen() {
+  const [providers, setProviders] = useState<AiProvider[]>([]);
+  const [routes, setRoutes] = useState<AiRoute[]>([]);
+  const [name, setName] = useState("aitunnel");
+  const [customName, setCustomName] = useState("");
+  const [baseUrl, setBaseUrl] = useState(AI_BASE_URLS.aitunnel);
+  const [modelId, setModelId] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const [providerEnabled, setProviderEnabled] = useState(true);
+  const [kind, setKind] = useState("constraints");
+  const [routeProvider, setRouteProvider] = useState("");
+  const [routeModel, setRouteModel] = useState("");
+  const [error, setError] = useState("");
+  const reload = () => Promise.all([getAiProviders(), getAiRoutes()])
+    .then(([nextProviders, nextRoutes]) => { setProviders(nextProviders); setRoutes(nextRoutes); })
+    .catch((reason) => setError(String(reason)));
+  useEffect(() => { void reload(); }, []);
+  return <div className="settings">
+    <h2>Провайдеры ИИ</h2>
+    <p className="hint">API-ключ сохраняется зашифрованным на сервере и не показывается после сохранения.</p>
+    <form className="card" onSubmit={(event) => {
+      event.preventDefault(); setError("");
+      saveAiProvider({ name: name === "custom" ? customName : name,
+        base_url: baseUrl, model_id: modelId, enabled: providerEnabled, api_key: apiKey || undefined })
+        .then(() => { setApiKey(""); void reload(); }).catch((reason) => setError(String(reason)));
+    }}>
+      <select value={name} onChange={(event) => {
+        const next = event.target.value; setName(next); setBaseUrl(AI_BASE_URLS[next] || "");
+      }}>
+        {Object.keys(AI_BASE_URLS).map((provider) => <option key={provider} value={provider}>{provider}</option>)}
+        <option value="custom">custom</option>
+      </select>
+      {name === "custom" && <input value={customName} onChange={(event) => setCustomName(event.target.value)} placeholder="Имя провайдера" required />}
+      <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} placeholder="HTTPS Base URL" required />
+      <input value={modelId} onChange={(event) => setModelId(event.target.value)} placeholder="Model ID" required />
+      <input value={apiKey} onChange={(event) => setApiKey(event.target.value)} type="password" autoComplete="off" placeholder="API Key (для нового провайдера)" />
+      <label><input type="checkbox" checked={providerEnabled} onChange={(event) => setProviderEnabled(event.target.checked)} /> Включён</label>
+      <button className="btn-primary" type="submit">Сохранить провайдера</button>
+    </form>
+    {error && <p className="error">{error}</p>}
+    {providers.map((provider) => <article className="card" key={provider.name}>
+      <h3>{provider.name}</h3>
+      <p className="hint">{provider.base_url} · {provider.model_id} · {provider.enabled ? "включён" : "отключён"}</p>
+      <div className="card-actions">
+        <button className="btn-outline" onClick={() => {
+          if (provider.name in AI_BASE_URLS) setName(provider.name);
+          else { setName("custom"); setCustomName(provider.name); }
+          setBaseUrl(provider.base_url); setModelId(provider.model_id); setApiKey("");
+          setProviderEnabled(provider.enabled);
+        }}>Изменить</button>
+        <button className="btn-outline" onClick={() => {
+          deleteAiProvider(provider.name).then(() => void reload()).catch((reason) => setError(String(reason)));
+        }}>Удалить</button>
+      </div>
+    </article>)}
+    <h2>Маршрутизация задач</h2>
+    <form className="card" onSubmit={(event) => {
+      event.preventDefault(); setError("");
+      saveAiRoute({ kind, provider_name: routeProvider, model_id: routeModel })
+        .then(() => void reload()).catch((reason) => setError(String(reason)));
+    }}>
+      <select value={kind} onChange={(event) => setKind(event.target.value)}>
+        {AI_TASKS.map((task) => <option key={task} value={task}>{task}</option>)}
+      </select>
+      <select value={routeProvider} onChange={(event) => {
+        setRouteProvider(event.target.value);
+        setRouteModel(providers.find((provider) => provider.name === event.target.value)?.model_id || "");
+      }} required>
+        <option value="">Выберите провайдера</option>
+        {providers.filter((provider) => provider.enabled).map((provider) => <option key={provider.name} value={provider.name}>{provider.name}</option>)}
+      </select>
+      <input value={routeModel} onChange={(event) => setRouteModel(event.target.value)} placeholder="Model ID для задачи" required />
+      <button className="btn-primary" type="submit">Назначить</button>
+    </form>
+    {routes.map((route) => <p className="card" key={route.kind}>
+      {route.kind}: {route.provider_name} / {route.model_id}
+    </p>)}
   </div>;
 }
 
