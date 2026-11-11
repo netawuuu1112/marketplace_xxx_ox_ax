@@ -538,10 +538,34 @@ function WatchesScreen() {
     </article>)}
     {selected !== null && <section className="card"><h3>История цены</h3>
       {history.length === 0 && <p className="hint">Замеров пока нет.</p>}
+      {history.length > 0 && <PriceHistorySummary points={history} />}
       {history.map((point) => <p key={`${point.captured_at}:${point.source}`}>
         {new Date(point.captured_at).toLocaleString("ru-RU")} · {point.source} · {rub(point.price_rub)}
       </p>)}
     </section>}
+  </div>;
+}
+
+function PriceHistorySummary({ points }: { points: PricePoint[] }) {
+  const chronological = [...points].reverse();
+  const prices = chronological.map((point) => point.price_rub);
+  const lowest = Math.min(...prices);
+  const highest = Math.max(...prices);
+  const average = prices.reduce((sum, price) => sum + price, 0) / prices.length;
+  const first = prices[0];
+  const last = prices[prices.length - 1];
+  const change = first > 0 ? ((last - first) / first) * 100 : 0;
+  const coordinates = prices.map((price, index) => {
+    const x = 8 + (prices.length === 1 ? 0 : index * 304 / (prices.length - 1));
+    const y = 100 - (price - lowest) * 84 / (highest - lowest || 1);
+    return `${x},${y}`;
+  }).join(" ");
+  return <div>
+    <p className="hint">Минимум: {rub(lowest)} · Средняя: {rub(Math.round(average))} · Изменение: {change.toFixed(1)}%</p>
+    {points.length > 1 && <svg viewBox="0 0 320 108" role="img" aria-label="График изменения цены" style={{ width: "100%", maxHeight: 170 }}>
+      <line x1="8" y1="100" x2="312" y2="100" stroke="currentColor" opacity="0.3" />
+      <polyline points={coordinates} fill="none" stroke="#2783de" strokeWidth="2.5" strokeLinejoin="round" />
+    </svg>}
   </div>;
 }
 
