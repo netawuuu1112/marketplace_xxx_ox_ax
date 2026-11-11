@@ -47,6 +47,8 @@ export async function myRole(): Promise<string> {
 
 export type AiProvider = { name: string; base_url: string; model_id: string; enabled: boolean };
 export type AiRoute = { kind: string; provider_name: string; model_id: string };
+export type AdminUser = { id: number; role: string; created_at: string };
+export type AuditEvent = { actor_id: number; action: string; subject: string; created_at: string };
 
 async function adminRequest<T>(path: string, method: string, body?: unknown): Promise<T> {
   const url = new URL(`${API}${path}`);
@@ -80,6 +82,18 @@ export async function deleteAiProvider(name: string): Promise<void> {
 
 export async function saveAiRoute(route: AiRoute): Promise<void> {
   await adminRequest("/api/admin/ai/routes", "PUT", route);
+}
+
+export async function getAdminUsers(): Promise<AdminUser[]> {
+  return (await adminRequest<{ users: AdminUser[] }>("/api/admin/users", "GET")).users;
+}
+
+export async function setAdminUserRole(id: number, role: "user" | "admin"): Promise<void> {
+  await adminRequest(`/api/admin/users/${id}/role`, "PUT", { role });
+}
+
+export async function getAuditEvents(): Promise<AuditEvent[]> {
+  return (await adminRequest<{ events: AuditEvent[] }>("/api/admin/audit", "GET")).events;
 }
 
 export async function login(password: string): Promise<void> {

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from "react";
-import { comparePrices, createWatch, currentUser, deleteAiProvider, getAiProviders, getAiRoutes, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, watchHistory, writeFavorite } from "./api";
-import type { AiProvider, AiRoute, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { comparePrices, createWatch, currentUser, deleteAiProvider, getAdminUsers, getAiProviders, getAiRoutes, getAuditEvents, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, setAdminUserRole, watchHistory, writeFavorite } from "./api";
+import type { AdminUser, AuditEvent, AiProvider, AiRoute, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
 
 const SUGGESTIONS = [
@@ -20,6 +20,7 @@ type Screen =
   | { name: "watches" }
   | { name: "notifications" }
   | { name: "admin_ai" }
+  | { name: "admin_users" }
   | { name: "settings" };
 
 function rub(n: number | null | undefined): string {
@@ -112,6 +113,7 @@ export default function App() {
         {screen.name === "watches" && <WatchesScreen />}
         {screen.name === "notifications" && <NotificationsScreen />}
         {screen.name === "admin_ai" && <AiAdminScreen />}
+        {screen.name === "admin_users" && <UsersAdminScreen />}
         {screen.name === "settings" && <SettingsScreen />}
       </main>
       <TabBar
@@ -153,6 +155,7 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
     watches: "Мониторинг",
     notifications: "Уведомления",
     admin_ai: "Настройки ИИ",
+    admin_users: "Пользователи",
     settings: "Настройки",
   };
   const canBack = screen.name !== "home";
@@ -170,6 +173,7 @@ function HomeScreen({ onOpen, admin }: { onOpen: (s: Screen) => void; admin: boo
   const [query, setQuery] = useState("");
   const [state, setState] = useState<"idle" | "busy">("idle");
   const [error, setError] = useState("");
+  const openedFromExtension = useRef(false);
 
   const run = useCallback(async (q: string) => {
     if (!q.trim()) return;
@@ -184,6 +188,17 @@ function HomeScreen({ onOpen, admin }: { onOpen: (s: Screen) => void; admin: boo
       setState("idle");
     }
   }, [onOpen]);
+
+  useEffect(() => {
+    if (openedFromExtension.current) return;
+    openedFromExtension.current = true;
+    const fromExtension = new URLSearchParams(window.location.search).get("q");
+    if (fromExtension) {
+      setQuery(fromExtension);
+      void run(fromExtension);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [run]);
 
   return (
     <div className="home">
@@ -222,6 +237,7 @@ function HomeScreen({ onOpen, admin }: { onOpen: (s: Screen) => void; admin: boo
         <MenuCard emoji="📉" title="Мониторинг" desc="Проверки цен и история" onClick={() => onOpen({ name: "watches" })} />
         <MenuCard emoji="🔔" title="Уведомления" desc="Достигнутые пороги цен" onClick={() => onOpen({ name: "notifications" })} />
         {admin && <MenuCard emoji="🧠" title="Настройки ИИ" desc="Провайдеры и модели по задачам" onClick={() => onOpen({ name: "admin_ai" })} />}
+        {admin && <MenuCard emoji="👥" title="Пользователи" desc="Роли и журнал действий" onClick={() => onOpen({ name: "admin_users" })} />}
         <MenuCard emoji="⚙️" title="Настройки" desc="Профиль и лимиты запросов" onClick={() => onOpen({ name: "settings" })} />
       </div>
     </div>
@@ -634,6 +650,53 @@ function AiAdminScreen() {
 }
 
 // ─────────────────────────── Settings ─────────────────────────────
+
+function UsersAdminScreen() {
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [events, setEvents] = useState<AuditEvent[]>([]);
+  const [userId, setUserId] = useState("");
+  const [role, setRole] = useState<"user" | "admin">("admin");
+  const [error, setError] = useState("");
+  const reload = () => Promise.all([getAdminUsers(), getAuditEvents()])
+    .then(([nextUsers, nextEvents]) => { setUsers(nextUsers); setEvents(nextEvents); })
+    .catch((reason) => setError(String(reason)));
+  useEffect(() => { void reload(); }, []);
+  const updateRole = (id: number, nextRole: "user" | "admin") => {
+    setError("");
+    setAdminUserRole(id, nextRole).then(() => void reload())
+      .catch((reason) => setError(String(reason)));
+  };
+  return <div className="settings">
+    <h2>Роли пользователей</h2>
+    <p className="hint">Укажите Telegram ID. Доступ к секретам и назначению ролей остаётся у Super Admin.</p>
+    <form className="card" onSubmit={(event) => {
+      event.preventDefault();
+      const id = Number(userId);
+      if (!Number.isSafeInteger(id) || id <= 0) { setError("Неверный Telegram ID"); return; }
+      updateRole(id, role);
+      setUserId("");
+    }}>
+      <input inputMode="numeric" value={userId} onChange={(event) => setUserId(event.target.value)} placeholder="Telegram ID" required />
+      <select value={role} onChange={(event) => setRole(event.target.value as "user" | "admin")}>
+        <option value="admin">Admin</option><option value="user">User</option>
+      </select>
+      <button className="btn-primary" type="submit">Сохранить роль</button>
+    </form>
+    {error && <p className="error">{error}</p>}
+    {users.map((user) => <article className="card" key={user.id}>
+      <b>{user.id}</b> · {user.role}
+      <p className="hint">Создан: {new Date(user.created_at).toLocaleString("ru-RU")}</p>
+      <div className="card-actions">
+        {user.role !== "admin" && <button className="btn-outline" onClick={() => updateRole(user.id, "admin")}>Сделать Admin</button>}
+        {user.role !== "user" && <button className="btn-outline" onClick={() => updateRole(user.id, "user")}>Сделать User</button>}
+      </div>
+    </article>)}
+    <h2>Журнал действий</h2>
+    {events.map((event, index) => <p className="card" key={`${event.created_at}-${index}`}>
+      {new Date(event.created_at).toLocaleString("ru-RU")} · {event.actor_id} · {event.action} · {event.subject}
+    </p>)}
+  </div>;
+}
 
 function SettingsScreen() {
   const [budget, setBudget] = useState<BudgetInfo | null>(null);

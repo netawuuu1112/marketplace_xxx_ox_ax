@@ -107,6 +107,15 @@ class PostgresDatabase(Database):
                     provider_name TEXT NOT NULL REFERENCES ai_providers(name) ON DELETE CASCADE,
                     model_id TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS audit_events (
+                    id BIGSERIAL PRIMARY KEY,
+                    actor_id BIGINT NOT NULL,
+                    action TEXT NOT NULL,
+                    subject TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_audit_events_created
+                    ON audit_events(created_at DESC);
             """)
 
     async def close(self) -> None:

@@ -287,6 +287,48 @@ async def cmd_notifications(message: Message) -> None:
     await message.answer("\n\n".join(lines) if lines else "Уведомлений пока нет.")
 
 
+def _bot_superadmin(message: Message) -> bool:
+    allowed = {value.strip() for value in os.getenv("TELEGRAM_ADMIN_IDS", "").split(",") if value.strip()}
+    return message.from_user is not None and str(message.from_user.id) in allowed
+
+
+@router.message(Command("admin_users"))
+async def cmd_admin_users(message: Message) -> None:
+    if not _bot_superadmin(message) or not hasattr(db, "pool"):
+        await message.answer("Недостаточно прав или PostgreSQL недоступна.")
+        return
+    rows = await db.pool.fetch("SELECT id,role FROM users ORDER BY created_at DESC LIMIT 30")
+    lines = [f"{row['id']} · {row['role']}" for row in rows]
+    await message.answer("\n".join(lines) if lines else "Пользователей пока нет.")
+
+
+@router.message(Command("admin_role"))
+async def cmd_admin_role(message: Message) -> None:
+    if not _bot_superadmin(message) or not hasattr(db, "pool"):
+        await message.answer("Недостаточно прав или PostgreSQL недоступна.")
+        return
+    parts = (message.text or "").split()
+    if len(parts) != 3 or not parts[1].isdigit() or int(parts[1]) <= 0 or parts[2] not in ("user", "admin"):
+        await message.answer("Пример: /admin_role 123456 admin")
+        return
+    target_id, role = int(parts[1]), parts[2]
+    async with db.pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("INSERT INTO users(id,role) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET role=excluded.role", target_id, role)
+            await conn.execute("INSERT INTO audit_events(actor_id,action,subject) VALUES($1,$2,$3)", message.from_user.id, "user.role.update", f"{target_id}:{role}")
+    await message.answer(f"Роль пользователя {target_id}: {role}")
+
+
+@router.message(Command("admin_audit"))
+async def cmd_admin_audit(message: Message) -> None:
+    if not _bot_superadmin(message) or not hasattr(db, "pool"):
+        await message.answer("Недостаточно прав или PostgreSQL недоступна.")
+        return
+    rows = await db.pool.fetch("SELECT actor_id,action,subject,created_at FROM audit_events ORDER BY created_at DESC LIMIT 20")
+    lines = [f"{row['created_at']:%d.%m %H:%M} · {row['actor_id']} · {_html.escape(row['action'])} · {_html.escape(row['subject'])}" for row in rows]
+    await message.answer("\n".join(lines) if lines else "Журнал пуст.")
+
+
 @router.message()
 async def on_text(message: Message) -> None:
     user_id = message.from_user.id

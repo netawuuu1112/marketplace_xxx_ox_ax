@@ -456,6 +456,34 @@ async function init() {
   document.documentElement.lang = uiLocale();
   applyDom();
   await load();
+  const fusion = await browser.storage.local.get({ fusionUrl: "http://localhost:8080" });
+  $("#fusion-url").value = fusion.fusionUrl;
+  $("#fusion-url").addEventListener("change", async function () {
+    await browser.storage.local.set({ fusionUrl: $("#fusion-url").value.trim() });
+  });
+  $("#fusion-search").addEventListener("click", async function () {
+    const raw = $("#fusion-url").value.trim();
+    let base;
+    try {
+      base = new URL(raw);
+      if (!["http:", "https:"].includes(base.protocol) || base.username || base.password) throw new Error();
+      if (base.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(base.hostname)) throw new Error();
+    } catch (_) {
+      $("#fusion-url").setCustomValidity("Укажите HTTPS-адрес MarketFusion или локальный http://localhost:8080");
+      $("#fusion-url").reportValidity();
+      return;
+    }
+    $("#fusion-url").setCustomValidity("");
+    await browser.storage.local.set({ fusionUrl: base.origin });
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true });
+    const query = (tabs[0] && tabs[0].title || "").split(/[|–—]/)[0].trim();
+    if (!query) { $("#fusion-search").textContent = "Откройте страницу товара"; return; }
+    base.pathname = "/";
+    base.search = "";
+    base.hash = "";
+    base.searchParams.set("q", query);
+    await browser.tabs.create({ url: base.toString() });
+  });
   $("#version").textContent = t("versionFootPopup", browser.runtime.getManifest().version);
 
   $("#btn-settings").addEventListener("click", function () {

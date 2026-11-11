@@ -128,7 +128,7 @@ def _telegram_admin(request: web.Request) -> bool:
     return user_id is not None and str(user_id) in {x.strip() for x in raw.split(",") if x.strip()}
 
 
-def _require_admin(request: web.Request) -> None:
+def _require_superadmin(request: web.Request) -> None:
     if not (_valid_web_session(request.cookies.get("mf_session", "")) or _telegram_admin(request)):
         raise web.HTTPForbidden(text="Требуются права администратора")
 
@@ -154,9 +154,17 @@ async def handle_login(request: web.Request) -> web.Response:
 
 
 async def handle_me(request: web.Request) -> web.Response:
-    _resolve_user(request)
+    user_id = _resolve_user(request)
+    db = request.app[CTX_KEY].db
+    if user_id > 0 and hasattr(db, "pool"):
+        await db.pool.execute("INSERT INTO users(id) VALUES($1) ON CONFLICT(id) DO NOTHING", user_id)
     admin = _valid_web_session(request.cookies.get("mf_session", "")) or _telegram_admin(request)
-    return web.json_response({"role": "super_admin" if admin else "user"})
+    if admin:
+        role = "super_admin"
+    else:
+        role = await db.pool.fetchval("SELECT role FROM users WHERE id=$1", user_id) if hasattr(db, "pool") else None
+        role = role or "user"
+    return web.json_response({"role": role})
 
 
 async def handle_logout(request: web.Request) -> web.Response:
@@ -384,13 +392,13 @@ async def handle_notifications(request: web.Request) -> web.Response:
 
 async def handle_ai_providers(request: web.Request) -> web.Response:
     from ai_settings import list_providers
-    _require_admin(request)
+    _require_superadmin(request)
     return web.json_response({"providers": await list_providers(_monitor_db(request))})
 
 
 async def handle_ai_provider_save(request: web.Request) -> web.Response:
     from ai_settings import save_provider
-    _require_admin(request)
+    _require_superadmin(request)
     data = await request.json()
     try:
         await save_provider(_monitor_db(request), str(data.get("name", "")),
@@ -399,32 +407,85 @@ async def handle_ai_provider_save(request: web.Request) -> web.Response:
                             bool(data.get("enabled", True)))
     except (ValueError, RuntimeError) as exc:
         raise web.HTTPBadRequest(text=str(exc))
+    await _monitor_db(request).pool.execute(
+        "INSERT INTO audit_events(actor_id,action,subject) VALUES($1,$2,$3)",
+        _resolve_user(request), "ai.provider.save", str(data.get("name", ""))[:100])
     return web.json_response({"ok": True})
 
 
 async def handle_ai_provider_delete(request: web.Request) -> web.Response:
     from ai_settings import delete_provider
-    _require_admin(request)
+    _require_superadmin(request)
     await delete_provider(_monitor_db(request), request.match_info["name"])
+    await _monitor_db(request).pool.execute(
+        "INSERT INTO audit_events(actor_id,action,subject) VALUES($1,$2,$3)",
+        _resolve_user(request), "ai.provider.delete", request.match_info["name"][:100])
     return web.json_response({"ok": True})
 
 
 async def handle_ai_routes(request: web.Request) -> web.Response:
     from ai_settings import list_routes
-    _require_admin(request)
+    _require_superadmin(request)
     return web.json_response({"routes": await list_routes(_monitor_db(request))})
 
 
 async def handle_ai_route_save(request: web.Request) -> web.Response:
     from ai_settings import save_route
-    _require_admin(request)
+    _require_superadmin(request)
     data = await request.json()
     try:
         await save_route(_monitor_db(request), str(data.get("kind", "")),
                          str(data.get("provider_name", "")), str(data.get("model_id", "")))
     except ValueError as exc:
         raise web.HTTPBadRequest(text=str(exc))
+    await _monitor_db(request).pool.execute(
+        "INSERT INTO audit_events(actor_id,action,subject) VALUES($1,$2,$3)",
+        _resolve_user(request), "ai.route.save", str(data.get("kind", ""))[:100])
     return web.json_response({"ok": True})
+
+
+async def handle_admin_users(request: web.Request) -> web.Response:
+    _require_superadmin(request)
+    db = _monitor_db(request)
+    rows = await db.pool.fetch("""
+        SELECT id,role,created_at FROM users ORDER BY created_at DESC LIMIT 200
+    """)
+    return web.json_response({"users": [
+        {"id": r["id"], "role": r["role"], "created_at": r["created_at"].isoformat()}
+        for r in rows]})
+
+
+async def handle_admin_user_role(request: web.Request) -> web.Response:
+    _require_superadmin(request)
+    db = _monitor_db(request)
+    user_id = int(request.match_info["user_id"])
+    data = await request.json()
+    role = data.get("role")
+    if role not in ("user", "admin") or user_id <= 0:
+        raise web.HTTPBadRequest(text="Недопустимая роль или пользователь")
+    actor_id = _resolve_user(request)
+    async with db.pool.acquire() as conn:
+        async with conn.transaction():
+            await conn.execute("""
+                INSERT INTO users(id,role) VALUES($1,$2)
+                ON CONFLICT(id) DO UPDATE SET role=excluded.role
+            """, user_id, role)
+            await conn.execute("""
+                INSERT INTO audit_events(actor_id,action,subject) VALUES($1,$2,$3)
+            """, actor_id, "user.role.update", f"{user_id}:{role}")
+    return web.json_response({"ok": True})
+
+
+async def handle_admin_audit(request: web.Request) -> web.Response:
+    _require_superadmin(request)
+    rows = await _monitor_db(request).pool.fetch("""
+        SELECT actor_id,action,subject,created_at FROM audit_events
+        ORDER BY created_at DESC LIMIT 100
+    """)
+    return web.json_response({"events": [
+        {"actor_id": r["actor_id"], "action": r["action"],
+         "subject": r["subject"], "created_at": r["created_at"].isoformat()}
+        for r in rows]})
 
 
 @web.middleware
@@ -528,6 +589,9 @@ def create_app(ctx: ApiContext) -> web.Application:
     app.router.add_delete("/api/admin/ai/providers/{name}", handle_ai_provider_delete)
     app.router.add_get("/api/admin/ai/routes", handle_ai_routes)
     app.router.add_put("/api/admin/ai/routes", handle_ai_route_save)
+    app.router.add_get("/api/admin/users", handle_admin_users)
+    app.router.add_put("/api/admin/users/{user_id:\\d+}/role", handle_admin_user_role)
+    app.router.add_get("/api/admin/audit", handle_admin_audit)
     app.router.add_get("/api/reviews", handle_reviews)
     app.router.add_get("/api/compare", handle_compare)
     app.router.add_get("/api/budget", handle_budget)
