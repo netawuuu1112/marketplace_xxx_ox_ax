@@ -49,6 +49,7 @@ export type AiProvider = { name: string; base_url: string; model_id: string; ena
 export type AiRoute = { kind: string; provider_name: string; model_id: string };
 export type AdminUser = { id: number; role: string; created_at: string };
 export type AuditEvent = { actor_id: number; action: string; subject: string; created_at: string };
+export type AdminOverview = { users: number; active_watches: number; notifications: number; failed_watches: number };
 
 async function adminRequest<T>(path: string, method: string, body?: unknown): Promise<T> {
   const url = new URL(`${API}${path}`);
@@ -94,6 +95,10 @@ export async function setAdminUserRole(id: number, role: "user" | "admin"): Prom
 
 export async function getAuditEvents(): Promise<AuditEvent[]> {
   return (await adminRequest<{ events: AuditEvent[] }>("/api/admin/audit", "GET")).events;
+}
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  return await adminRequest<AdminOverview>("/api/admin/overview", "GET");
 }
 
 export async function login(password: string): Promise<void> {

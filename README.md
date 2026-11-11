@@ -11,6 +11,7 @@
 - Мониторинг цен в PostgreSQL: наблюдения с интервалами от 15 минут до суток, история проверок, пороговые уведомления в вебе и Telegram. Отдельный worker восстанавливает расписание после перезапуска.
 - Настройки OpenAI-совместимых LLM-провайдеров через админ-экран: зашифрованные ключи, модели и назначение задач. Поддерживаются AITUNNEL, OpenAI, Qwen, DeepSeek и произвольный совместимый API; для Kimi необходимо ввести Base URL своего API. Без ключей базовый поиск работает без LLM.
 - Super Admin может просматривать пользователей, назначать роли `admin` и `user` и читать журнал административных действий через веб и Mini App. В боте доступны `/admin_users`, `/admin_role <Telegram ID> <admin|user>`, `/admin_audit`; они ограничены `TELEGRAM_ADMIN_IDS`.
+- Роль Admin может видеть сводку по пользователям, активным и ошибочным наблюдениям и уведомлениям через веб, Mini App и команду бота `/admin_stats`. Управление API-ключами остаётся у Super Admin.
 - Исходники расширения Cennik в `browser-extension`. Кнопка «Найти дешевле» открывает текущий товар в общем веб-поиске MarketFusion с той же веб-сессией. Собственный локальный мониторинг Cennik пока не синхронизирован с API.
 - Для Chrome соберите Manifest V3 пакет командой `cd browser-extension; ./build-chrome.ps1` на Windows или `cd browser-extension && ./build-chrome.sh` на Linux; загрузите папку `dist-chrome` как распакованное расширение. Для Firefox используется `browser-extension/manifest.json`.
 
@@ -35,6 +36,7 @@
 - `/api/watches`, `/api/watches/{id}/history`, `/api/notifications` — мониторинг, история и уведомления. В боте команды `/watch`, `/watches`, `/history`, `/unwatch`, `/notifications`.
 - `/api/admin/ai/providers`, `/api/admin/ai/routes` — настройка ИИ-провайдеров и маршрутизации; доступны веб-администратору и Telegram ID из `TELEGRAM_ADMIN_IDS`.
 - `/api/admin/users`, `/api/admin/users/{id}/role`, `/api/admin/audit` — пользователи, роли и журнал действий Super Admin.
+- `/api/admin/overview` — сводка для Admin и Super Admin.
 - `/api/search`, `/api/compare`, `/api/reviews`, `/api/budget`, `/api/stats` — функции Smart Shopper.
 
 Поиск требует веб-сессию или проверенные Telegram `initData`. Секреты остаются в `.env` на сервере.

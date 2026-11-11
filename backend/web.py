@@ -133,6 +133,16 @@ def _require_superadmin(request: web.Request) -> None:
         raise web.HTTPForbidden(text="Требуются права администратора")
 
 
+async def _require_admin(request: web.Request) -> None:
+    if _valid_web_session(request.cookies.get("mf_session", "")) or _telegram_admin(request):
+        return
+    user_id = _resolve_user(request)
+    db = request.app[CTX_KEY].db
+    role = await db.pool.fetchval("SELECT role FROM users WHERE id=$1", user_id) if hasattr(db, "pool") else None
+    if role != "admin":
+        raise web.HTTPForbidden(text="Требуются права Admin")
+
+
 async def handle_login(request: web.Request) -> web.Response:
     password = os.getenv("WEB_ADMIN_PASSWORD", "")
     secret = os.getenv("WEB_SESSION_SECRET", "")
@@ -455,6 +465,17 @@ async def handle_admin_users(request: web.Request) -> web.Response:
         for r in rows]})
 
 
+async def handle_admin_overview(request: web.Request) -> web.Response:
+    await _require_admin(request)
+    row = await _monitor_db(request).pool.fetchrow("""
+        SELECT (SELECT count(*) FROM users) AS users,
+               (SELECT count(*) FROM watchlists WHERE active) AS active_watches,
+               (SELECT count(*) FROM notifications) AS notifications,
+               (SELECT count(*) FROM watchlists WHERE last_error IS NOT NULL) AS failed_watches
+    """)
+    return web.json_response(dict(row))
+
+
 async def handle_admin_user_role(request: web.Request) -> web.Response:
     _require_superadmin(request)
     db = _monitor_db(request)
@@ -590,6 +611,7 @@ def create_app(ctx: ApiContext) -> web.Application:
     app.router.add_get("/api/admin/ai/routes", handle_ai_routes)
     app.router.add_put("/api/admin/ai/routes", handle_ai_route_save)
     app.router.add_get("/api/admin/users", handle_admin_users)
+    app.router.add_get("/api/admin/overview", handle_admin_overview)
     app.router.add_put("/api/admin/users/{user_id:\\d+}/role", handle_admin_user_role)
     app.router.add_get("/api/admin/audit", handle_admin_audit)
     app.router.add_get("/api/reviews", handle_reviews)

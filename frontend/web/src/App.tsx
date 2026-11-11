@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { comparePrices, createWatch, currentUser, deleteAiProvider, getAdminUsers, getAiProviders, getAiRoutes, getAuditEvents, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, setAdminUserRole, watchHistory, writeFavorite } from "./api";
-import type { AdminUser, AuditEvent, AiProvider, AiRoute, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
+import { comparePrices, createWatch, currentUser, deleteAiProvider, getAdminOverview, getAdminUsers, getAiProviders, getAiRoutes, getAuditEvents, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, setAdminUserRole, watchHistory, writeFavorite } from "./api";
+import type { AdminOverview, AdminUser, AuditEvent, AiProvider, AiRoute, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
 
 const SUGGESTIONS = [
@@ -21,6 +21,7 @@ type Screen =
   | { name: "notifications" }
   | { name: "admin_ai" }
   | { name: "admin_users" }
+  | { name: "admin_overview" }
   | { name: "settings" };
 
 function rub(n: number | null | undefined): string {
@@ -75,7 +76,7 @@ export default function App() {
       <Header screen={screen} onBack={() => go({ name: "home" })} />
       <main className="content">
         {screen.name === "home" && (
-          <HomeScreen onOpen={(s) => go(s)} admin={role === "super_admin"} />
+          <HomeScreen onOpen={(s) => go(s)} role={role} />
         )}
         {screen.name === "results" && (
           <ResultsScreen
@@ -114,6 +115,7 @@ export default function App() {
         {screen.name === "notifications" && <NotificationsScreen />}
         {screen.name === "admin_ai" && <AiAdminScreen />}
         {screen.name === "admin_users" && <UsersAdminScreen />}
+        {screen.name === "admin_overview" && <AdminOverviewScreen />}
         {screen.name === "settings" && <SettingsScreen />}
       </main>
       <TabBar
@@ -156,6 +158,7 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
     notifications: "Уведомления",
     admin_ai: "Настройки ИИ",
     admin_users: "Пользователи",
+    admin_overview: "Сводка",
     settings: "Настройки",
   };
   const canBack = screen.name !== "home";
@@ -169,7 +172,7 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
 
 // ─────────────────────────── Home ─────────────────────────────────
 
-function HomeScreen({ onOpen, admin }: { onOpen: (s: Screen) => void; admin: boolean }) {
+function HomeScreen({ onOpen, role }: { onOpen: (s: Screen) => void; role: string }) {
   const [query, setQuery] = useState("");
   const [state, setState] = useState<"idle" | "busy">("idle");
   const [error, setError] = useState("");
@@ -236,8 +239,9 @@ function HomeScreen({ onOpen, admin }: { onOpen: (s: Screen) => void; admin: boo
         <MenuCard emoji="⭐" title="Избранное" desc="Сохранённые товары" onClick={() => onOpen({ name: "favorites" })} />
         <MenuCard emoji="📉" title="Мониторинг" desc="Проверки цен и история" onClick={() => onOpen({ name: "watches" })} />
         <MenuCard emoji="🔔" title="Уведомления" desc="Достигнутые пороги цен" onClick={() => onOpen({ name: "notifications" })} />
-        {admin && <MenuCard emoji="🧠" title="Настройки ИИ" desc="Провайдеры и модели по задачам" onClick={() => onOpen({ name: "admin_ai" })} />}
-        {admin && <MenuCard emoji="👥" title="Пользователи" desc="Роли и журнал действий" onClick={() => onOpen({ name: "admin_users" })} />}
+        {(role === "super_admin" || role === "admin") && <MenuCard emoji="📊" title="Сводка" desc="Пользователи и мониторинг" onClick={() => onOpen({ name: "admin_overview" })} />}
+        {role === "super_admin" && <MenuCard emoji="🧠" title="Настройки ИИ" desc="Провайдеры и модели по задачам" onClick={() => onOpen({ name: "admin_ai" })} />}
+        {role === "super_admin" && <MenuCard emoji="👥" title="Пользователи" desc="Роли и журнал действий" onClick={() => onOpen({ name: "admin_users" })} />}
         <MenuCard emoji="⚙️" title="Настройки" desc="Профиль и лимиты запросов" onClick={() => onOpen({ name: "settings" })} />
       </div>
     </div>
@@ -674,6 +678,22 @@ function AiAdminScreen() {
 }
 
 // ─────────────────────────── Settings ─────────────────────────────
+
+function AdminOverviewScreen() {
+  const [overview, setOverview] = useState<AdminOverview | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => { getAdminOverview().then(setOverview).catch((reason) => setError(String(reason))); }, []);
+  return <div className="settings">
+    <h2>Состояние системы</h2>
+    {error && <p className="error">{error}</p>}
+    {overview && <div className="card">
+      <p>Пользователи: {overview.users}</p>
+      <p>Активные наблюдения: {overview.active_watches}</p>
+      <p>Уведомления: {overview.notifications}</p>
+      <p>Наблюдения с ошибкой: {overview.failed_watches}</p>
+    </div>}
+  </div>;
+}
 
 function UsersAdminScreen() {
   const [users, setUsers] = useState<AdminUser[]>([]);

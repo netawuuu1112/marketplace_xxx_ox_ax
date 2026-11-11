@@ -292,6 +292,26 @@ def _bot_superadmin(message: Message) -> bool:
     return message.from_user is not None and str(message.from_user.id) in allowed
 
 
+@router.message(Command("admin_stats"))
+async def cmd_admin_stats(message: Message) -> None:
+    if not hasattr(db, "pool") or message.from_user is None:
+        await message.answer("PostgreSQL недоступна.")
+        return
+    role = await db.pool.fetchval("SELECT role FROM users WHERE id=$1", message.from_user.id)
+    if role != "admin" and not _bot_superadmin(message):
+        await message.answer("Требуются права Admin.")
+        return
+    row = await db.pool.fetchrow("""
+        SELECT (SELECT count(*) FROM users) AS users,
+               (SELECT count(*) FROM watchlists WHERE active) AS active_watches,
+               (SELECT count(*) FROM notifications) AS notifications,
+               (SELECT count(*) FROM watchlists WHERE last_error IS NOT NULL) AS failed_watches
+    """)
+    await message.answer(
+        f"Пользователи: {row['users']}\nАктивные наблюдения: {row['active_watches']}\n"
+        f"Уведомления: {row['notifications']}\nНаблюдения с ошибкой: {row['failed_watches']}")
+
+
 @router.message(Command("admin_users"))
 async def cmd_admin_users(message: Message) -> None:
     if not _bot_superadmin(message) or not hasattr(db, "pool"):
