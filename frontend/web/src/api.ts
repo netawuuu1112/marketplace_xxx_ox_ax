@@ -69,6 +69,52 @@ export async function writeFavorite(product: Product, remove: boolean): Promise<
   if (!response.ok) throw new Error(`Избранное: ${response.status}`);
 }
 
+export type Watch = {
+  id: number; query: string; threshold_rub: number | null;
+  interval_minutes: number; active: boolean; last_price_rub: number | null;
+  last_checked_at: string | null; last_error: string | null;
+};
+
+export type PricePoint = { captured_at: string; price_rub: number; source: string; product_url: string };
+export type Notification = { id: number; title: string; body: string; created_at: string; read: boolean };
+
+export async function listWatches(): Promise<Watch[]> {
+  return (await getJson<{ watches: Watch[] }>("/api/watches", authParams())).watches;
+}
+
+export async function watchHistory(id: number): Promise<PricePoint[]> {
+  return (await getJson<{ history: PricePoint[] }>(`/api/watches/${id}/history`, authParams())).history;
+}
+
+export async function listNotifications(): Promise<Notification[]> {
+  return (await getJson<{ notifications: Notification[] }>("/api/notifications", authParams())).notifications;
+}
+
+export async function createWatch(query: string, threshold: number | null, interval: number): Promise<Watch> {
+  const { initData } = launchInfo();
+  const url = new URL(`${API}/api/watches`);
+  const { user_id } = authParams();
+  if (user_id) url.searchParams.set("user_id", user_id);
+  const response = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...(initData ? { "X-Telegram-Init-Data": initData } : {}) },
+    body: JSON.stringify({ query, threshold_rub: threshold, interval_minutes: interval }),
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return (await response.json()) as Watch;
+}
+
+export async function removeWatch(id: number): Promise<void> {
+  const { initData } = launchInfo();
+  const url = new URL(`${API}/api/watches/${id}`);
+  const { user_id } = authParams();
+  if (user_id) url.searchParams.set("user_id", user_id);
+  const response = await fetch(url.toString(), {
+    method: "DELETE", headers: initData ? { "X-Telegram-Init-Data": initData } : {},
+  });
+  if (!response.ok) throw new Error(`Удаление: ${response.status}`);
+}
+
 // Реальный бэкенд подключается переменной VITE_API_URL при сборке:
 //   VITE_API_URL=https://api.example.com npm run build
 // Без неё Mini App работает в демо-режиме на встроенном каталоге

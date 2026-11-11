@@ -1,7 +1,6 @@
 """PostgreSQL implementation of the shared Smart Shopper storage contract."""
 from __future__ import annotations
 
-import json
 from datetime import datetime, timedelta, timezone
 
 import asyncpg
@@ -59,6 +58,42 @@ class PostgresDatabase(Database):
                     key TEXT PRIMARY KEY,
                     value TEXT NOT NULL
                 );
+                CREATE TABLE IF NOT EXISTS watchlists (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    query TEXT NOT NULL,
+                    sources TEXT[],
+                    threshold_rub NUMERIC(12,2),
+                    interval_minutes INTEGER NOT NULL DEFAULT 60,
+                    active BOOLEAN NOT NULL DEFAULT true,
+                    last_price_rub NUMERIC(12,2),
+                    last_checked_at TIMESTAMPTZ,
+                    next_run_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    last_error TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                );
+                CREATE INDEX IF NOT EXISTS idx_watchlists_due
+                    ON watchlists(next_run_at) WHERE active;
+                CREATE TABLE IF NOT EXISTS price_history (
+                    id BIGSERIAL PRIMARY KEY,
+                    watch_id BIGINT NOT NULL REFERENCES watchlists(id) ON DELETE CASCADE,
+                    captured_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    price_rub NUMERIC(12,2) NOT NULL,
+                    source TEXT NOT NULL,
+                    product_url TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_price_history_watch
+                    ON price_history(watch_id,captured_at DESC);
+                CREATE TABLE IF NOT EXISTS notifications (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL,
+                    title TEXT NOT NULL,
+                    body TEXT NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    read_at TIMESTAMPTZ
+                );
+                CREATE INDEX IF NOT EXISTS idx_notifications_user
+                    ON notifications(user_id,created_at DESC);
             """)
 
     async def close(self) -> None:

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { comparePrices, currentUser, getBudget, getReviews, listFavorites, login, searchMarketplaces, searchProducts, writeFavorite } from "./api";
-import type { MarketplaceSearch } from "./api";
+import { comparePrices, createWatch, currentUser, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, removeWatch, searchMarketplaces, searchProducts, watchHistory, writeFavorite } from "./api";
+import type { MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
 
 const SUGGESTIONS = [
@@ -17,6 +17,8 @@ type Screen =
   | { name: "reviews"; product: Product }
   | { name: "compare"; rows: CompareRow[]; query: string }
   | { name: "favorites" }
+  | { name: "watches" }
+  | { name: "notifications" }
   | { name: "settings" };
 
 function rub(n: number | null | undefined): string {
@@ -104,6 +106,8 @@ export default function App() {
         {screen.name === "favorites" && (
           <FavoritesScreen items={favorites} onProduct={(p) => go({ name: "product", product: p })} />
         )}
+        {screen.name === "watches" && <WatchesScreen />}
+        {screen.name === "notifications" && <NotificationsScreen />}
         {screen.name === "settings" && <SettingsScreen />}
       </main>
       <TabBar
@@ -142,6 +146,8 @@ function Header({ screen, onBack }: { screen: Screen; onBack: () => void }) {
     reviews: "Отзывы",
     compare: "Сравнение цен",
     favorites: "Избранное",
+    watches: "Мониторинг",
+    notifications: "Уведомления",
     settings: "Настройки",
   };
   const canBack = screen.name !== "home";
@@ -208,6 +214,8 @@ function HomeScreen({ onOpen }: { onOpen: (s: Screen) => void }) {
         }} />
         <MenuCard emoji="⚖️" title="Сравнить цены" desc="Ozon vs Яндекс Маркет" onClick={() => onOpen({ name: "compare", rows: [], query: "" })} />
         <MenuCard emoji="⭐" title="Избранное" desc="Сохранённые товары" onClick={() => onOpen({ name: "favorites" })} />
+        <MenuCard emoji="📉" title="Мониторинг" desc="Проверки цен и история" onClick={() => onOpen({ name: "watches" })} />
+        <MenuCard emoji="🔔" title="Уведомления" desc="Достигнутые пороги цен" onClick={() => onOpen({ name: "notifications" })} />
         <MenuCard emoji="⚙️" title="Настройки" desc="Профиль и лимиты запросов" onClick={() => onOpen({ name: "settings" })} />
       </div>
     </div>
@@ -464,6 +472,69 @@ function FavoritesScreen({ items, onProduct }: { items: Product[]; onProduct: (p
       ))}
     </div>
   );
+}
+
+function WatchesScreen() {
+  const [items, setItems] = useState<Watch[]>([]);
+  const [query, setQuery] = useState("");
+  const [threshold, setThreshold] = useState("");
+  const [interval, setInterval] = useState(60);
+  const [history, setHistory] = useState<PricePoint[]>([]);
+  const [selected, setSelected] = useState<number | null>(null);
+  const [error, setError] = useState("");
+  useEffect(() => { listWatches().then(setItems).catch((e) => setError(String(e))); }, []);
+  return <div className="settings">
+    <h2>Отслеживание цен</h2>
+    <form className="card" onSubmit={(event) => {
+      event.preventDefault(); setError("");
+      createWatch(query, threshold ? Number(threshold) : null, interval)
+        .then((watch) => { setItems([watch, ...items]); setQuery(""); setThreshold(""); })
+        .catch((e) => setError(String(e)));
+    }}>
+      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Название товара" required minLength={2} />
+      <input value={threshold} onChange={(event) => setThreshold(event.target.value)} type="number" min="1" step="0.01" placeholder="Порог цены, ₽ (необязательно)" />
+      <select value={interval} onChange={(event) => setInterval(Number(event.target.value))}>
+        {[15, 30, 60, 180, 360, 720, 1440].map((minutes) => <option key={minutes} value={minutes}>Каждые {minutes} мин</option>)}
+      </select>
+      <button className="btn-primary" type="submit">Добавить</button>
+    </form>
+    {error && <p className="error">{error}</p>}
+    {items.map((watch) => <article className="card" key={watch.id}>
+      <h3>{watch.query}</h3>
+      <p className="price">{rub(watch.last_price_rub)}</p>
+      <p className="hint">Порог: {rub(watch.threshold_rub)} · Интервал: {watch.interval_minutes} мин</p>
+      <p className="hint">Последняя проверка: {watch.last_checked_at ? new Date(watch.last_checked_at).toLocaleString("ru-RU") : "ещё не выполнялась"}</p>
+      {watch.last_error && <p className="error">{watch.last_error}</p>}
+      <div className="card-actions">
+        <button className="btn-outline" onClick={() => {
+          watchHistory(watch.id).then((rows) => { setSelected(watch.id); setHistory(rows); }).catch((e) => setError(String(e)));
+        }}>История</button>
+        <button className="btn-outline" onClick={() => {
+          removeWatch(watch.id).then(() => setItems(items.filter((item) => item.id !== watch.id))).catch((e) => setError(String(e)));
+        }}>Удалить</button>
+      </div>
+    </article>)}
+    {selected !== null && <section className="card"><h3>История цены</h3>
+      {history.length === 0 && <p className="hint">Замеров пока нет.</p>}
+      {history.map((point) => <p key={`${point.captured_at}:${point.source}`}>
+        {new Date(point.captured_at).toLocaleString("ru-RU")} · {point.source} · {rub(point.price_rub)}
+      </p>)}
+    </section>}
+  </div>;
+}
+
+function NotificationsScreen() {
+  const [items, setItems] = useState<Notification[]>([]);
+  const [error, setError] = useState("");
+  useEffect(() => { listNotifications().then(setItems).catch((e) => setError(String(e))); }, []);
+  return <div className="settings"><h2>Уведомления</h2>
+    {error && <p className="error">{error}</p>}
+    {items.length === 0 && <p className="hint">Пока нет уведомлений.</p>}
+    {items.map((item) => <article className="card" key={item.id}>
+      <h3>{item.title}</h3><p>{item.body}</p>
+      <p className="hint">{new Date(item.created_at).toLocaleString("ru-RU")}</p>
+    </article>)}
+  </div>;
 }
 
 // ─────────────────────────── Settings ─────────────────────────────

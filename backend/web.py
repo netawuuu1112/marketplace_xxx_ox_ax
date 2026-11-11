@@ -320,6 +320,55 @@ async def handle_remove_favorite(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+def _monitor_db(request: web.Request):
+    db = request.app[CTX_KEY].db
+    if not hasattr(db, "pool"):
+        raise web.HTTPServiceUnavailable(text="Monitoring requires PostgreSQL")
+    return db
+
+
+async def handle_list_watches(request: web.Request) -> web.Response:
+    from monitoring import list_watches
+    return web.json_response({"watches": await list_watches(_monitor_db(request), _resolve_user(request))})
+
+
+async def handle_create_watch(request: web.Request) -> web.Response:
+    from monitoring import create_watch
+    user_id = _resolve_user(request)
+    try:
+        data = await request.json()
+        watch = await create_watch(_monitor_db(request), user_id,
+                                   str(data.get("query", "")),
+                                   float(data["threshold_rub"]) if data.get("threshold_rub") is not None else None,
+                                   int(data.get("interval_minutes", 60)),
+                                   data.get("sources"))
+    except (ValueError, TypeError) as exc:
+        raise web.HTTPBadRequest(text=str(exc))
+    return web.json_response(watch, status=201)
+
+
+async def handle_delete_watch(request: web.Request) -> web.Response:
+    from monitoring import delete_watch
+    deleted = await delete_watch(_monitor_db(request), _resolve_user(request),
+                                 int(request.match_info["watch_id"]))
+    if not deleted:
+        raise web.HTTPNotFound()
+    return web.json_response({"ok": True})
+
+
+async def handle_price_history(request: web.Request) -> web.Response:
+    from monitoring import price_history
+    rows = await price_history(_monitor_db(request), _resolve_user(request),
+                               int(request.match_info["watch_id"]))
+    return web.json_response({"history": rows})
+
+
+async def handle_notifications(request: web.Request) -> web.Response:
+    from monitoring import list_notifications
+    rows = await list_notifications(_monitor_db(request), _resolve_user(request))
+    return web.json_response({"notifications": rows})
+
+
 @web.middleware
 async def _auth_middleware(request: web.Request, handler):
     if config.API_TOKEN and request.path != "/health":
@@ -411,6 +460,11 @@ def create_app(ctx: ApiContext) -> web.Application:
     app.router.add_get("/api/favorites", handle_list_favorites)
     app.router.add_post("/api/favorites", handle_add_favorite)
     app.router.add_delete("/api/favorites", handle_remove_favorite)
+    app.router.add_get("/api/watches", handle_list_watches)
+    app.router.add_post("/api/watches", handle_create_watch)
+    app.router.add_delete("/api/watches/{watch_id:\\d+}", handle_delete_watch)
+    app.router.add_get("/api/watches/{watch_id:\\d+}/history", handle_price_history)
+    app.router.add_get("/api/notifications", handle_notifications)
     app.router.add_get("/api/reviews", handle_reviews)
     app.router.add_get("/api/compare", handle_compare)
     app.router.add_get("/api/budget", handle_budget)

@@ -219,6 +219,74 @@ async def cmd_compare(message: Message) -> None:
     await _run_compare(message, text)
 
 
+@router.message(Command("watch"))
+async def cmd_watch(message: Message) -> None:
+    """/watch название товара | порог в рублях"""
+    if not hasattr(db, "pool"):
+        await message.answer("Мониторинг доступен при запуске с PostgreSQL.")
+        return
+    from monitoring import create_watch
+    raw = (message.text or "").partition(" ")[2].strip()
+    query, sep, price = raw.partition("|")
+    try:
+        threshold = float(price.strip()) if sep and price.strip() else None
+        watch = await create_watch(db, message.from_user.id, query, threshold, 60, None)
+    except ValueError as exc:
+        await message.answer(_html.escape(str(exc)))
+        return
+    await message.answer(f"Добавлено наблюдение #{watch['id']}: {_html.escape(watch['query'])}")
+
+
+@router.message(Command("watches"))
+async def cmd_watches(message: Message) -> None:
+    if not hasattr(db, "pool"):
+        await message.answer("Мониторинг доступен при запуске с PostgreSQL.")
+        return
+    from monitoring import list_watches
+    rows = await list_watches(db, message.from_user.id)
+    if not rows:
+        await message.answer("Наблюдений пока нет. Пример: /watch SSD 1 ТБ | 5000")
+        return
+    lines = [f"#{r['id']} {_html.escape(r['query'])} — {_rub(r['last_price_rub'])}"
+             for r in rows[:20]]
+    await message.answer("\n".join(lines))
+
+
+@router.message(Command("unwatch"))
+async def cmd_unwatch(message: Message) -> None:
+    from monitoring import delete_watch
+    raw = (message.text or "").partition(" ")[2].strip()
+    if not raw.isdigit() or not hasattr(db, "pool"):
+        await message.answer("Пример: /unwatch 12")
+        return
+    deleted = await delete_watch(db, message.from_user.id, int(raw))
+    await message.answer("Наблюдение удалено." if deleted else "Наблюдение не найдено.")
+
+
+@router.message(Command("history"))
+async def cmd_history(message: Message) -> None:
+    from monitoring import price_history
+    raw = (message.text or "").partition(" ")[2].strip()
+    if not raw.isdigit() or not hasattr(db, "pool"):
+        await message.answer("Пример: /history 12")
+        return
+    rows = await price_history(db, message.from_user.id, int(raw))
+    lines = [f"{r['captured_at'][:16]} · {r['source']} · {_rub(r['price_rub'])}"
+             for r in rows[:20]]
+    await message.answer("\n".join(lines) if lines else "Замеров пока нет.")
+
+
+@router.message(Command("notifications"))
+async def cmd_notifications(message: Message) -> None:
+    if not hasattr(db, "pool"):
+        await message.answer("Уведомления доступны при запуске с PostgreSQL.")
+        return
+    from monitoring import list_notifications
+    rows = await list_notifications(db, message.from_user.id)
+    lines = [f"{_html.escape(r['title'])}: {_html.escape(r['body'])}" for r in rows[:10]]
+    await message.answer("\n\n".join(lines) if lines else "Уведомлений пока нет.")
+
+
 @router.message()
 async def on_text(message: Message) -> None:
     user_id = message.from_user.id

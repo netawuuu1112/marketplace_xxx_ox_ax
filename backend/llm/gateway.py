@@ -156,9 +156,11 @@ class LLMGateway:
         if kind not in TEXT_KINDS | {"vision"}:
             raise ValueError(f"неизвестный kind: {kind}")
         if self._provider is None and self._local is None:
-            return await self._mock.complete(model="mock", kind=kind,
-                                             prompt=prompt, schema=schema,
-                                             images=images)
+            if config.DEMO_MODE:
+                return await self._mock.complete(model="mock", kind=kind,
+                                                 prompt=prompt, schema=schema,
+                                                 images=images)
+            raise ProviderError("LLM provider is not configured")
         # локальная модель — бесплатная и безлимитная: пробуем первой
         # только для механических задач (см. LOCAL_KINDS)
         if self._local is not None and kind in LOCAL_KINDS:
@@ -207,11 +209,8 @@ class LLMGateway:
                 last_error = exc
                 logger.warning("Модель %s упала (%s), пробую следующую в цепочке",
                                model, exc)
-        logger.error("Все модели цепочки %s упали: %s — фолбэк на mock",
-                     chain, last_error)
-        return await self._mock.complete(model="mock", kind=kind,
-                                         prompt=prompt, schema=schema,
-                                         images=images)
+        logger.error("Все модели цепочки %s недоступны: %s", chain, last_error)
+        raise ProviderError("LLM providers are unavailable") from last_error
 
     def _resolve_provider(self, raw: str) -> tuple:
         """Модель 'mistral:mistral-small-latest' → (MistralProvider, модель).

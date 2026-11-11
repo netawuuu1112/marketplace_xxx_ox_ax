@@ -188,7 +188,7 @@ class Orchestrator:
         constraints = await self._extract_constraints(user_text, state)
         outcome = await self._execute_search(constraints, progress, markets,
                                              late_cb)
-        outcome.used_llm = True
+        outcome.used_llm = self._llm.real or config.DEMO_MODE
 
         # память сессии (PRD §5): сжатое состояние для уточнений
         state.mode = "search"
@@ -219,9 +219,13 @@ class Orchestrator:
             )
         prompt = (CONSTRAINTS_PROMPT
                   + f"\n\nПОЛЬЗОВАТЕЛЬ: {user_text}" + context)
-        constraints = await self._llm.structured(kind="constraints",
-                                                 prompt=prompt,
-                                                 schema=SearchConstraints)
+        try:
+            constraints = await self._llm.structured(kind="constraints",
+                                                     prompt=prompt,
+                                                     schema=SearchConstraints)
+        except Exception as exc:
+            logger.warning("LLM query parsing unavailable: %s", type(exc).__name__)
+            constraints = SearchConstraints(query=user_text)
 
         # детерминированное дополнение (ТЗ §2): LLM мог пропустить цену,
         # бренд или рейтинг — структурный парсер закрывает пробелы
