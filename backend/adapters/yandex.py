@@ -73,6 +73,26 @@ class YandexMarketAdapter(BaseAdapter):
             logger.warning("YM: бутстрап cookies не удался")
 
     async def search(self, query: str, limit: int = 5) -> list[Product]:
+        # The shared connector has a maintained Yandex search path. Use its
+        # priced offers first, while retaining the legacy channels as fallback.
+        try:
+            from compare_connector.server import compare_prices
+
+            comparison = await compare_prices(
+                query, per_source_limit=limit, sources=["yandex_market"])
+            products = [Product(
+                marketplace="yandex", ext_id=offer.product_id,
+                title=offer.title, price=round(offer.price_rub),
+                url=offer.url, rating=offer.rating,
+                reviews_count=offer.rating_count or 0, brand=offer.brand,
+            ) for offer in comparison.offers
+                if offer.source == "yandex_market" and offer.product_id
+                and offer.title and offer.price_rub is not None
+                and offer.price_rub > 0 and offer.url]
+            if products:
+                return products
+        except Exception as exc:
+            logger.warning("YM connector search failed: %s", exc)
         # канал 1: зафиксированный JSON-эндпоинт поиска
         ep = pick_endpoint(self._captured, "search")
         if ep:

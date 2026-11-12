@@ -58,11 +58,17 @@ class OpenAICompatProvider:
         else:
             messages = [{"role": "user", "content": prompt}]
 
+        # DeepSeek V4 Pro spends part of max_tokens on reasoning. With the
+        # default 1600 it can finish with no user-visible JSON at all.
+        reasoning_model = self.name == "aitunnel" and model.startswith("deepseek-v4-pro")
+        completion_options = ({"max_tokens": 4096, "reasoning_effort": "low"}
+                              if reasoning_model else {"max_tokens": 1600})
+
         try:
             resp = await asyncio.wait_for(
                 self._client.chat.completions.create(
                     model=model, messages=messages, temperature=0.1,
-                    max_tokens=1600,
+                    **completion_options,
                     response_format=_json_schema(schema),
                 ),
                 timeout=self._timeout,
@@ -76,7 +82,7 @@ class OpenAICompatProvider:
                     resp = await asyncio.wait_for(
                         self._client.chat.completions.create(
                             model=model, messages=messages, temperature=0.1,
-                            max_tokens=1600,
+                            **completion_options,
                         ),
                         timeout=self._timeout,
                     )
