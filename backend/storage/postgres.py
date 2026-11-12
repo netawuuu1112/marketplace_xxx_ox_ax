@@ -22,7 +22,11 @@ class PostgresDatabase(Database):
     async def connect(self) -> None:
         self._pool = await asyncpg.create_pool(self._url, min_size=1, max_size=10)
         async with self.pool.acquire() as conn:
-            await conn.execute("""
+            # API, worker and bot can start together against an empty database.
+            # Serialize their DDL so concurrent IF NOT EXISTS checks cannot race.
+            async with conn.transaction():
+                await conn.execute("SELECT pg_advisory_xact_lock(824502, 1)")
+                await conn.execute("""
                 CREATE TABLE IF NOT EXISTS users (
                     id BIGINT PRIMARY KEY,
                     role TEXT NOT NULL DEFAULT 'user',
@@ -116,7 +120,7 @@ class PostgresDatabase(Database):
                 );
                 CREATE INDEX IF NOT EXISTS idx_audit_events_created
                     ON audit_events(created_at DESC);
-            """)
+                """)
 
     async def close(self) -> None:
         if self._pool is not None:
