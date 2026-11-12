@@ -1,4 +1,4 @@
-export type Marketplace = "ozon" | "yandex";
+export type Marketplace = "ozon" | "yandex" | "wb";
 
 export interface Product {
   marketplace: Marketplace;

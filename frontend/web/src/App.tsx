@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { comparePrices, createWatch, currentUser, deleteAiProvider, getAdminOverview, getAdminUsers, getAiProviders, getAiRoutes, getAuditEvents, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, setAdminUserRole, watchHistory, writeFavorite } from "./api";
-import type { AdminOverview, AdminUser, AuditEvent, AiProvider, AiRoute, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
+import type { AdminOverview, AdminUser, AuditEvent, AiProvider, AiRoute, MarketplaceOffer, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
 
 const SUGGESTIONS = [
@@ -29,10 +29,10 @@ function rub(n: number | null | undefined): string {
   return n.toLocaleString("ru-RU") + " ₽";
 }
 
-function MarketBadge({ m }: { m: "ozon" | "yandex" }) {
-  return m === "ozon"
-    ? <span className="badge badge-ozon">🟢 Ozon</span>
-    : <span className="badge badge-ym">🔵 Яндекс</span>;
+function MarketBadge({ m }: { m: Product["marketplace"] }) {
+  if (m === "ozon") return <span className="badge badge-ozon">🟢 Ozon</span>;
+  if (m === "wb") return <span className="badge">🟣 Wildberries</span>;
+  return <span className="badge badge-ym">🔵 Яндекс</span>;
 }
 
 function VerdictMark({ v }: { v: string }) {
@@ -90,7 +90,7 @@ export default function App() {
             onReviews={(p) => go({ name: "reviews", product: p })}
           />
         )}
-        {screen.name === "marketplaces" && <MarketplaceResults result={screen.result} />}
+        {screen.name === "marketplaces" && <MarketplaceResults result={screen.result} isFav={isFav} onFav={saveFav} />}
         {screen.name === "product" && (
           <ProductScreen
             product={screen.product}
@@ -260,7 +260,32 @@ function MenuCard({ emoji, title, desc, onClick }: { emoji: string; title: strin
   );
 }
 
-function MarketplaceResults({ result }: { result: MarketplaceSearch }) {
+function productFromOffer(offer: MarketplaceOffer): Product | null {
+  const markets: Record<string, Product["marketplace"]> = {
+    ozon: "ozon", yandex_market: "yandex", wildberries: "wb",
+  };
+  const marketplace = markets[offer.source];
+  if (!marketplace || !offer.product_id || !offer.url || offer.price_rub == null || offer.price_rub <= 0) return null;
+  return {
+    marketplace, ext_id: offer.product_id,
+    title: offer.title, price: Math.round(offer.price_rub), url: offer.url,
+    rating: offer.rating, reviews_count: offer.rating_count ?? 0,
+    brand: offer.brand, traits: [],
+  };
+}
+
+function sourceStatus(source: string, status: string): string {
+  const name = { ozon: "Ozon", yandex_market: "Яндекс Маркет", wildberries: "Wildberries" }[source] ?? source;
+  if (status === "blocked") return `${name}: сейчас недоступен`;
+  if (status === "timeout") return `${name}: не ответил вовремя`;
+  return `${name}: поиск пока не выполнен`;
+}
+
+function MarketplaceResults({ result, isFav, onFav }: {
+  result: MarketplaceSearch;
+  isFav: (p: Product) => boolean;
+  onFav: (p: Product) => void;
+}) {
   return (
     <section className="results">
       <div className="results-head">
@@ -274,10 +299,11 @@ function MarketplaceResults({ result }: { result: MarketplaceSearch }) {
         <p className="winner">Наиболее выгодное сопоставимое предложение: {result.cheapest_comparable.source}, {rub(result.cheapest_comparable.price_rub)}</p>
       )}
       {result.source_outcomes.filter((s) => s.status !== "ok").map((s) => (
-        <p className="hint" key={s.source}>{s.source}: {s.status}{s.detail ? ` — ${s.detail}` : ""}</p>
+        <p className="hint" key={s.source}>{sourceStatus(s.source, s.status)}</p>
       ))}
-      {result.offers.map((offer, index) => (
-        <article className="card" key={`${offer.source}:${offer.product_id}:${index}`}>
+      {result.offers.map((offer, index) => {
+        const product = productFromOffer(offer);
+        return <article className="card" key={`${offer.source}:${offer.product_id}:${index}`}>
           <div className="card-head"><span className="badge">{offer.source}</span></div>
           <h3>{offer.title}</h3>
           <p className="price"><b>{rub(offer.price_rub)}</b></p>
@@ -288,8 +314,11 @@ function MarketplaceResults({ result }: { result: MarketplaceSearch }) {
             {[offer.brand, offer.seller, offer.rating != null ? `⭐ ${offer.rating}` : "", offer.in_stock === null ? "Наличие неизвестно" : offer.in_stock ? "В наличии" : "Нет в наличии"].filter(Boolean).join(" · ")}
           </p>
           {offer.url && <a className="btn-outline" href={offer.url} target="_blank" rel="noreferrer">Открыть товар</a>}
-        </article>
-      ))}
+          {product && <button className="btn-outline" onClick={() => onFav(product)}>
+            {isFav(product) ? "⭐ Убрать из избранного" : "⭐ В избранное"}
+          </button>}
+        </article>;
+      })}
       {result.offers.length === 0 && <p className="hint">Подтверждённых предложений по запросу нет.</p>}
     </section>
   );
