@@ -1,0 +1,13 @@
+.env
+.venv/
+**/__pycache__/
+*.py[cod]
+*.db
+*.db-shm
+*.db-wal
+frontend/web/node_modules/
+frontend/web/dist/
+browser-extension/dist-chrome/
+backups/
+*.log
+deployed-version
