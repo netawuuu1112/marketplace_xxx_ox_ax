@@ -1,4 +1,4 @@
-import { retrieveLaunchParams } from "@telegram-apps/sdk";
+import { retrieveLaunchParams, retrieveRawInitData } from "@telegram-apps/sdk";
 import { DEMO_PRODUCTS, DEMO_REVIEWS } from "./data";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
 
@@ -199,11 +199,8 @@ function score(p: Product, q: string): number {
 function launchInfo(): { initData: string; userId: string } {
   try {
     const lp = retrieveLaunchParams();
-    const userId = String(
-      (lp.initData as unknown as { user?: { id?: number } } | undefined)
-        ?.user?.id ?? "",
-    );
-    return { initData: String(lp.initDataRaw ?? ""), userId };
+    const userId = String(lp.tgWebAppData?.user?.id ?? "");
+    return { initData: retrieveRawInitData() ?? "", userId };
   } catch {
     return { initData: "", userId: "1" };
   }
