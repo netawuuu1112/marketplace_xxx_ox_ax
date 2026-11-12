@@ -6,7 +6,7 @@ foreach ($name in @("_locales", "icons", "lib", "content", "popup", "page", "bac
 }
 Copy-Item manifest.chrome.json dist-chrome/manifest.json
 Copy-Item sw.js dist-chrome/sw.js
-Copy-Item -LiteralPath ../licenses/Cennik.LICENSE -Destination dist-chrome/LICENSE
+Copy-Item -LiteralPath LICENSE -Destination dist-chrome/LICENSE
 Copy-Item -LiteralPath NOTICE.md -Destination dist-chrome/NOTICE.md
 $polyfill = '<script src="../lib/browser-polyfill.min.js"></script>'
 $i18n = '<script src="../lib/i18n.js"></script>'
