@@ -3,6 +3,11 @@ set -eu
 
 # A container restart keeps /tmp; the previous Xvfb process is gone then.
 rm -f /tmp/.X99-lock
+# The persistent profile retains Chrome's host-specific singleton symlinks
+# after the former container has been stopped during Compose recreation.
+rm -f /home/browser/profile/SingletonLock \
+  /home/browser/profile/SingletonSocket \
+  /home/browser/profile/SingletonCookie
 Xvfb :99 -screen 0 1280x800x24 -nolisten tcp &
 xvfb_pid=$!
 sleep 1

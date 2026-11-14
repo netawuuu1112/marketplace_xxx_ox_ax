@@ -8,6 +8,8 @@ RUN apt-get update \
     && mkdir -p /home/browser/profile \
     && chown -R browser:browser /home/browser
 
+RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+
 COPY deployment/chrome/start.sh /usr/local/bin/start-marketfusion-chrome
 COPY deployment/chrome/cdp-nginx.conf /etc/nginx/cdp.conf
 RUN chmod 755 /usr/local/bin/start-marketfusion-chrome
