@@ -24,7 +24,7 @@ export type MarketplaceSearch = {
   total_offers: number;
   cheapest_comparable: MarketplaceOffer | null;
   offers: MarketplaceOffer[];
-  source_outcomes: { source: string; status: string; detail: string }[];
+  source_outcomes: { source: string; status: string; detail: string; offers_returned: number }[];
   warnings: string[];
 };
 

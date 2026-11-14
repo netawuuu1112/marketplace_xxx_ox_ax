@@ -286,15 +286,22 @@ function MarketplaceResults({ result, isFav, onFav }: {
   isFav: (p: Product) => boolean;
   onFav: (p: Product) => void;
 }) {
+  const pricedSources = new Set(result.offers.filter((offer) => offer.price_rub != null && offer.price_rub > 0).map((offer) => offer.source));
+  const unpricedSources = result.source_outcomes.filter((outcome) => outcome.status === "ok" && outcome.offers_returned > 0 && !pricedSources.has(outcome.source));
   return (
     <section className="results">
       <div className="results-head">
         <h2>«{result.query}»</h2>
         <p className="hint">
           Найдено {result.total_offers} предложений. Ответили {result.sources_ok.length} из {result.sources_queried.length} источников.
-          {!result.complete && " Сравнение неполное."}
+          {(!result.complete || unpricedSources.length > 0) && " Сравнение цен неполное."}
         </p>
       </div>
+      {unpricedSources.map((outcome) => (
+        <p className="hint" key={`unpriced:${outcome.source}`}>
+          {outcome.source}: товары найдены, но обычная цена не подтверждена; эти товары не участвуют в выборе самой низкой цены.
+        </p>
+      ))}
       {result.cheapest_comparable && (
         <p className="winner">Наиболее выгодное сопоставимое предложение: {result.cheapest_comparable.source}, {rub(result.cheapest_comparable.price_rub)}</p>
       )}

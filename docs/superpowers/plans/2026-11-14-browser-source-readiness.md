@@ -29,8 +29,8 @@
 - [x] Write an opt-in Compose browser service and bootstrap script. Run Chromium as an unprivileged user with a dedicated persistent profile; bind a CDP proxy only inside its container.
 - [x] Run `docker compose -f docker-compose.yml -f docker-compose.browser.yml config --quiet` with safe test values. Confirm the computed Chrome service has no `ports:` publication.
 - [x] Extend CI Compose validation to include the browser override.
-- [ ] Build and start the override on the VPS without changing existing database volumes. Confirm CDP answers from the API container and the public port 9222 is closed.
-- [ ] Run `marketplace-mcp doctor` for Ozon, Wildberries, Avito and the remaining sources. Record observed status per source; do not infer availability from a Chrome startup alone.
+- [x] Build and start the override on the VPS without changing existing database volumes. Confirm CDP answers from the API container and the Chrome service has no published port 9222.
+- [x] Run `marketplace-mcp doctor` for Ozon, Wildberries and Avito, then exercise all ten searchable sources through the public authenticated comparison API. Record observed status per source; do not infer availability from a Chrome startup alone.
 
 ### Task 2: Source report
 
@@ -38,7 +38,7 @@
 
 **Interfaces:** Selfcheck results from the running API container, including source status and reason.
 
-- [ ] Record the current VPS selfcheck matrix and distinguish search health from card/review health.
-- [ ] Record the results after browser activation, with date and exact limitations.
-- [ ] State whether login, suitable network access or commercial credentials remain necessary for each source.
+- [x] Record the current VPS selfcheck matrix and distinguish search health from card/review health.
+- [x] Record the results after browser activation, with date and exact limitations.
+- [x] State whether login, suitable network access or commercial credentials remain necessary for each source.
 - [ ] Commit and push the verified status to `feature/core-integration`; keep PR #1 in draft until user flows pass.
