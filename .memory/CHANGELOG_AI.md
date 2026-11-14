@@ -6,4 +6,4 @@ Changed `deployment/chrome/*`, `docker-compose.browser.yml`, `backend/Dockerfile
 
 ## 2026-11-14 — Explicit price coverage warning
 
-Changed `frontend/web/src/App.tsx` and `frontend/web/src/api.ts` to show when a source returned products without ordinary prices. TypeScript and Vite build passed locally. Deployment and browser verification remain pending.
+Changed `frontend/web/src/App.tsx` and `frontend/web/src/api.ts` to show when a source returned products without ordinary prices. TypeScript and Vite build passed locally; rebuilt the web image on VPS and verified the public asset hash matches the local build. Live WB repeat exposed intermittent page navigation; doctor still reports card parser drift.

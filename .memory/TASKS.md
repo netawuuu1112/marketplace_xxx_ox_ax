@@ -2,7 +2,7 @@
 
 - [x] Deploy private Chromium route and verify CDP from API.
 - [x] Probe all ten comparison sources through public authenticated API and record observed state.
-- [ ] Deploy and verify user-facing warning for sources with cards but no ordinary price.
+- [x] Deploy and verify user-facing warning for sources with cards but no ordinary price (TypeScript/Vite build and matching public bundle hash).
 - [ ] Determine whether Wildberries product-card route can yield a confirmed ordinary price.
 - [ ] Obtain permitted working access for blocked marketplaces within user constraints; retest each source.
 - [ ] Verify same-item cross-market comparison with at least two confirmed ordinary prices.

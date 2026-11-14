@@ -2,7 +2,8 @@
 
 - HTTPS site and core Docker services answer; API sees a private Chromium CDP container.
 - Public authenticated search for `ssd` returned five offers from Yandex Market with five ordinary prices and five Wildberries cards with zero ordinary prices. Other eight comparison sources failed or timed out on this VPS. Details: `docs/MVP_SOURCE_STATUS_RU.md`.
-- Browser route has been deployed on the VPS. Frontend now shows incomplete price coverage when a source provides cards without ordinary prices; frontend redeployment is pending.
+- Browser route and updated frontend have been deployed on the VPS. Public HTTPS serves the newly built frontend bundle and `/health` returns 200. The UI warns when a source provides cards without ordinary prices.
+- WB browser search is intermittent: an isolated repeat failed after page navigation, and repeated connector doctor returned `drift_detected` for product cards. It is not a stable price source.
 - Existing search, favorites and bot start have passed previous live checks, but full end-to-end review, photo search, monitoring, price alerts and admin workflows are not verified across all sources.
 - Full all-source MVP is blocked by external access and data-rights constraints under the current no-spend/no-contact requirement. Do not substitute conditional prices or fabricate offers.
 

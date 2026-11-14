@@ -41,4 +41,4 @@
 - [x] Record the current VPS selfcheck matrix and distinguish search health from card/review health.
 - [x] Record the results after browser activation, with date and exact limitations.
 - [x] State whether login, suitable network access or commercial credentials remain necessary for each source.
-- [ ] Commit and push the verified status to `feature/core-integration`; keep PR #1 in draft until user flows pass.
+- [x] Commit and push the verified status to `feature/core-integration`; keep PR #1 in draft until user flows pass.
