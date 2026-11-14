@@ -6,7 +6,7 @@
 
 **Architecture:** An opt-in Compose file starts a dedicated Chromium container with a persistent profile and no published ports. API, bot and worker reach its CDP proxy over the private Compose network. The existing connector's HTTP-to-CDP fallback remains responsible for each source; the browser does not alter search results or fabricate prices.
 
-**Tech Stack:** Docker Compose, Debian Chromium, Xvfb, socat, Python connector CLI.
+**Tech Stack:** Docker Compose, Debian Chromium, Xvfb, private Nginx CDP proxy, Python connector CLI.
 
 **Spec:** `docs/superpowers/specs/2026-11-14-mvp-readiness-design.md`
 
@@ -22,13 +22,13 @@
 
 ### Task 1: Browser service
 
-**Files:** Create `deployment/chrome/Dockerfile`, `deployment/chrome/start.sh`, `docker-compose.browser.yml`. Modify `.github/workflows/verify.yml`.
+**Files:** Create `deployment/chrome/Dockerfile`, `deployment/chrome/start.sh`, `deployment/chrome/cdp-nginx.conf`, `docker-compose.browser.yml`. Modify `.github/workflows/verify.yml`.
 
 **Interfaces:** Compose service name `chrome`; internal CDP endpoint `chrome:9222`; named volume `chrome_profile`; environment `CHROME_CDP_HOST=chrome` in API, bot and worker.
 
-- [ ] Write an opt-in Compose browser service and bootstrap script. Run Chromium as an unprivileged user with a dedicated persistent profile; bind a CDP forwarder only inside its container.
-- [ ] Run `docker compose -f docker-compose.yml -f docker-compose.browser.yml config --quiet` with safe test values. Confirm the computed Chrome service has no `ports:` publication.
-- [ ] Extend CI Compose validation to include the browser override.
+- [x] Write an opt-in Compose browser service and bootstrap script. Run Chromium as an unprivileged user with a dedicated persistent profile; bind a CDP proxy only inside its container.
+- [x] Run `docker compose -f docker-compose.yml -f docker-compose.browser.yml config --quiet` with safe test values. Confirm the computed Chrome service has no `ports:` publication.
+- [x] Extend CI Compose validation to include the browser override.
 - [ ] Build and start the override on the VPS without changing existing database volumes. Confirm CDP answers from the API container and the public port 9222 is closed.
 - [ ] Run `marketplace-mcp doctor` for Ozon, Wildberries, Avito and the remaining sources. Record observed status per source; do not infer availability from a Chrome startup alone.
 

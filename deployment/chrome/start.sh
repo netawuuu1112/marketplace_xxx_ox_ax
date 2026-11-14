@@ -19,10 +19,10 @@ chromium \
   about:blank &
 chrome_pid=$!
 
-# Chromium binds CDP to loopback. Forward it only onto this container's private
-# Compose network; the service has no published host port.
-socat TCP-LISTEN:9222,bind=0.0.0.0,reuseaddr,fork TCP:127.0.0.1:9223 &
-socat_pid=$!
+# Chromium only accepts localhost as the CDP HTTP Host. The private proxy
+# rewrites that header and forwards WebSocket upgrades within this container.
+nginx -c /etc/nginx/cdp.conf -g 'daemon off;' &
+proxy_pid=$!
 
-trap 'kill "$chrome_pid" "$socat_pid" "$xvfb_pid" 2>/dev/null || true' EXIT INT TERM
+trap 'kill "$chrome_pid" "$proxy_pid" "$xvfb_pid" 2>/dev/null || true' EXIT INT TERM
 wait "$chrome_pid"
