@@ -6,6 +6,7 @@ import logging
 from decimal import Decimal
 
 import aiohttp
+from telegram_transport import build_notification_connector
 
 from compare_connector.server import compare_prices
 
@@ -131,7 +132,7 @@ async def check_watch(db, row, bot_token: str = "") -> None:
 
 async def _send_telegram(token: str, user_id: int, body: str) -> None:
     try:
-        async with aiohttp.ClientSession() as session:
+        async with aiohttp.ClientSession(connector=build_notification_connector()) as session:
             async with session.post(f"https://api.telegram.org/bot{token}/sendMessage",
                                     json={"chat_id": user_id, "text": body},
                                     timeout=aiohttp.ClientTimeout(total=10)) as response:

@@ -2,6 +2,7 @@ aiogram>=3.13
 asyncpg>=0.30
 cryptography>=45
 aiohttp>=3.10
+aiohttp-socks>=0.9,<1.0
 aiosqlite>=0.20
 pydantic>=2.9
 openai>=1.60

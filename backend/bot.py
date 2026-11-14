@@ -44,6 +44,7 @@ from matcher.matcher import (compare_across_all, compare_across_markets)
 import web as webmod
 from middlewares import LoggingMiddleware, ThrottlingMiddleware
 from models import Product, ReviewAnalysis, SessionState
+from telegram_transport import build_bot
 from search.embeddings import warmup
 from storage.db import Database
 from storage import create_database
@@ -1032,7 +1033,7 @@ async def cache_cleanup_loop(db: Database, interval: float = 3600.0) -> None:
 async def main() -> None:
     if not config.BOT_TOKEN:
         raise SystemExit("SHOPPER_BOT_TOKEN не задан — проверьте .env / start.bat")
-    bot = Bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = build_bot(config.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher()
     dp.include_router(router)
     dp.errors.register(_handle_update_error)

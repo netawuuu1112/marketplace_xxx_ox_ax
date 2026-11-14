@@ -11,6 +11,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 # ── Telegram ─────────────────────────────────────────────────────
 BOT_TOKEN = os.getenv("SHOPPER_BOT_TOKEN", "")
+TELEGRAM_SOCKS_PROXY = os.getenv("TELEGRAM_SOCKS_PROXY", "")
 
 # ── OpenRouter (PRD, раздел 3: лимиты и реестр :free-моделей) ────
 # Имя ключа из корневого .env портфолио — OPEN_ROUTER_KEY (вторичное).
