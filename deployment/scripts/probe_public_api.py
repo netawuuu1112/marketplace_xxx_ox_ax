@@ -45,7 +45,11 @@ def main() -> None:
         "complete": search.get("complete"),
         "total_offers": search.get("total_offers"),
         "outcomes": [
-            {"source": item["source"], "status": item["status"], "offers": item["offers_returned"]}
+            {
+                "source": item["source"], "status": item["status"],
+                "offers": item["offers_returned"], "code": item.get("error_code"),
+                "detail": item.get("detail", "")[:220],
+            }
             for item in search.get("source_outcomes", [])
         ],
         "ordinary_prices": sum(offer.get("price_rub") is not None for offer in search.get("offers", [])),

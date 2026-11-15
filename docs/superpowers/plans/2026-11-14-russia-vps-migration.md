@@ -39,17 +39,17 @@
 - [x] Install Docker Compose, Nginx and Certbot; configure persistent swap and firewall with SSH retained.
 - [x] Clone `feature/core-integration`, transfer `.env` privately, adjust deployment-only variables and proxy URL, and verify Compose config.
 - [x] Make and retain a PostgreSQL dump on the old VPS; copy it to the new VPS and restore with table/row checks.
-- [ ] Start DB, API, web, worker and optional Chrome with resource limits; verify local health, logs and data.
+- [x] Start DB, API, web, worker and private Chrome; verify local health, logs and migrated data. VPS has persistent 4 GiB swap; monitor resource use under all-source searches.
 
 ### Task 4: HTTPS and singleton bot cutover
 
 - [x] Confirm authoritative DNS points to `48.103.149.93`; configure Nginx and obtain certificate.
 - [x] Verify public HTTPS routes and Telegram Mini App URL.
-- [ ] Stop only the old MarketFusion bot, start the new bot through SOCKS5, verify Bot API and user flow.
-- [ ] Verify real search, favorites, monitoring state and admin/session continuity; record marketplace source outcomes from new IP.
+- [x] Stop the old MarketFusion bot, start the singleton new bot through SOCKS5, verify Bot API and user-confirmed `/start` and Mini App.
+- [x] Verify real search, favorite, watch/worker history and signed admin access; record marketplace source outcomes from new IP. Alert delivery and other workflows remain in `.memory/TASKS.md`.
 
 ### Task 5: Retire old MarketFusion
 
-- [ ] After all cutover checks pass, stop and remove only old MarketFusion containers and project files/volumes, keeping a restorable DB backup and the Finland SOCKS5 service.
-- [ ] Verify proxy from new VPS still works and old MarketFusion no longer serves traffic.
-- [ ] Update README, `.memory` and PR status; run tests and record remaining MVP gaps.
+- [x] After cutover checks, remove old MarketFusion containers, project directory and volumes; retain restorable DB and Chrome archives on the new VPS and keep Finland SOCKS5.
+- [x] Verify SOCKS5 from new VPS still works and no old MarketFusion application containers remain. The temporary Finland Nginx DNS bridge is scheduled for guarded retirement after 2026-11-17 00:00 UTC.
+- [x] Update README, `.memory` and PR status; run tests and record remaining MVP gaps.

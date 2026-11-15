@@ -3,6 +3,8 @@
 - [x] Deploy private Chromium route and verify CDP from API.
 - [x] Probe all ten comparison sources through public authenticated API and record observed state.
 - [x] Deploy and verify user-facing warning for sources with cards but no ordinary price (TypeScript/Vite build and matching public bundle hash).
+- [x] Migrate MarketFusion to the Russia VPS with PostgreSQL, Chrome profile, HTTPS and a single Telegram bot; retain Finland SOCKS5 and a guarded temporary DNS bridge.
+- [x] Verify a real Yandex Market price watch via worker and remove the temporary watch.
 - [ ] Determine whether Wildberries product-card route can yield a confirmed ordinary price.
 - [ ] Obtain permitted working access for blocked marketplaces within user constraints; retest each source.
 - [ ] Verify same-item cross-market comparison with at least two confirmed ordinary prices.

@@ -1,5 +1,9 @@
 # Decisions
 
+## 2026-11-15 — Russia VPS and Telegram transport
+
+Run production on `48.103.149.93` and route only Telegram Bot API traffic through the existing Finland SOCKS5 proxy with remote DNS. Direct Bot API traffic from the new VPS timed out. Keep Chrome private and persist the migrated PostgreSQL and browser state. Retain a guarded Finland Nginx bridge for stale DNS and retire it after 2026-11-17 00:00 UTC once new DNS and health checks pass. Preserve the proxy independently of the removed old application.
+
 ## 2026-11-14 — Private Chromium route
 
 Run Chromium as an optional dedicated Compose service on the internal network, with no published CDP port. This supports connector browser transport without changing the database or exposing browser control publicly. It cannot defeat source IP blocks.

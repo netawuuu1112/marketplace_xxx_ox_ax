@@ -1,10 +1,9 @@
-# Current state — 2026-11-14
+# Current state — 2026-11-15
 
-- HTTPS site and core Docker services answer; API sees a private Chromium CDP container.
-- Public authenticated search for `ssd` returned five offers from Yandex Market with five ordinary prices and five Wildberries cards with zero ordinary prices. Other eight comparison sources failed or timed out on this VPS. Details: `docs/MVP_SOURCE_STATUS_RU.md`.
-- Browser route and updated frontend have been deployed on the VPS. Public HTTPS serves the newly built frontend bundle and `/health` returns 200. The UI warns when a source provides cards without ordinary prices.
-- WB browser search is intermittent: an isolated repeat failed after page navigation, and repeated connector doctor returned `drift_detected` for product cards. It is not a stable price source.
-- Existing search, favorites and bot start have passed previous live checks, but full end-to-end review, photo search, monitoring, price alerts and admin workflows are not verified across all sources.
-- Full all-source MVP is blocked by external access and data-rights constraints under the current no-spend/no-contact requirement. Do not substitute conditional prices or fabricate offers.
+- Production is on Ubuntu VPS `48.103.149.93`, `/opt/marketfusion`, HTTPS `marketfusionai.kosmo-connect.ru`. Docker Compose runs db, API, web, worker, bot and private Chrome. The user confirmed live `/start` and Mini App opening.
+- PostgreSQL and Chrome profile were migrated from Finland with retained restorable archives on the new VPS. Old and new DB counts matched at cutover: 2 users, 1 favorite, 1 AI provider, 5 AI routes, 2 sessions. Public signed auth returned `super_admin` and the favorite.
+- Telegram Bot API is reached through the existing Finland SOCKS5 service. The Finland MarketFusion containers, volumes and `/opt/marketfusion` were removed after verification; the proxy remains running. A guarded Nginx bridge on Finland handles stale DNS until its scheduled retirement after 2026-11-17 00:00 UTC.
+- Public `ssd` search on the new VPS returns five ordinary prices from Yandex Market. Wildberries sometimes returns cards without ordinary prices; the other eight sources are blocked or time out. The all-source comparison is not a complete MVP. See `docs/MVP_SOURCE_STATUS_RU.md`.
+- Live watch probe verified that the worker recorded a Yandex Market ordinary price in history without error; the temporary watch was deleted and the original count restored. Price-change alerts, photo search, AI analysis and full admin flows are not yet verified end to end on the new VPS.
 
-Next: deploy and verify frontend warning, investigate WB card price, validate each remaining user workflow and record exact blockers.
+Next: obtain a permitted reliable data path for missing sources within the user's no-spend/no-contact constraints and verify every remaining workflow. Do not claim all-source MVP until live evidence supports it.
