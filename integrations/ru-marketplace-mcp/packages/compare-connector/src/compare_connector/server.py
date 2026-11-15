@@ -104,6 +104,7 @@ SERVER_STARTED_AT = datetime.datetime.now(datetime.UTC).isoformat().replace("+00
 # Per-source ceiling. Yandex pages are ~2 MB and WB search occasionally stalls, so
 # a slow source must not hold the whole comparison hostage.
 SOURCE_TIMEOUT_S = float(os.environ.get("COMPARE_SOURCE_TIMEOUT", "45"))
+WB_SOURCE_TIMEOUT_S = float(os.environ.get("COMPARE_WB_SOURCE_TIMEOUT", "80"))
 
 # How many native diagnostics one source may contribute to a comparison. The
 # list stays bounded, and a bounded list that had to be cut says how many
@@ -604,6 +605,30 @@ async def _search_wildberries(query: str, limit: int) -> list[MarketOffer]:
                 _conditional_price_warning("wildberries", str(item.nm_id or ""), item.wallet_price_rub, "wallet")
             )
     batch = OfferBatch(offers, response)
+    # WB search tiles may show only the Wallet price. A single product-card
+    # navigation can establish the ordinary price without treating the struck
+    # marketing price or the Wallet amount as an everyday quote.
+    candidate = next((offer for offer in batch if offer.price_kind == "wallet" and offer.product_id.isdecimal()), None)
+    if candidate is not None:
+        try:
+            card = await server.wb_card(nm_ids=[int(candidate.product_id)])
+            native = next(
+                (item for item in (getattr(card, "items", None) or []) if item.nm_id == int(candidate.product_id)),
+                None,
+            )
+            ordinary = R.coerce_price(native.price_rub) if native is not None and native.price_kind == "regular" else None
+            if ordinary is not None:
+                candidate.price_rub = ordinary
+                candidate.price_native = ordinary
+                candidate.price_kind = "regular"
+                if native.wallet_price_rub is not None:
+                    conditional_warnings.append(
+                        _conditional_price_warning("wildberries", candidate.product_id, native.wallet_price_rub, "wallet")
+                    )
+            else:
+                batch.warnings.append("wb_card_enrichment: card did not confirm an ordinary price for this nmId")
+        except Exception as exc:
+            batch.warnings.append(f"wb_card_enrichment: card read failed ({type(exc).__name__})")
     batch.warnings.extend(conditional_warnings)
     return batch
 
@@ -987,13 +1012,14 @@ async def _run_source(name: str, query: str, limit: int) -> tuple[SourceOutcome,
     """
     started = time.monotonic()
     try:
-        offers = await asyncio.wait_for(_SEARCH_IMPLS[name](query, limit), timeout=SOURCE_TIMEOUT_S)
+        timeout_s = WB_SOURCE_TIMEOUT_S if name == "wildberries" else SOURCE_TIMEOUT_S
+        offers = await asyncio.wait_for(_SEARCH_IMPLS[name](query, limit), timeout=timeout_s)
     except TimeoutError:
         return (
             SourceOutcome(
                 source=name,
                 status="timeout",
-                detail=f"no response within {SOURCE_TIMEOUT_S:.0f}s",
+                detail=f"no response within {timeout_s:.0f}s",
                 error_code=ErrorCode.TIMEOUT.value,
                 retryable=True,
                 elapsed_ms=round((time.monotonic() - started) * 1000),

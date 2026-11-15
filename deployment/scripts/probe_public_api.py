@@ -53,6 +53,7 @@ def main() -> None:
             for item in search.get("source_outcomes", [])
         ],
         "ordinary_prices": sum(offer.get("price_rub") is not None for offer in search.get("offers", [])),
+        "first_offer_url": search.get("offers", [{}])[0].get("url") if search.get("offers") else None,
     }, ensure_ascii=False))
 
 
