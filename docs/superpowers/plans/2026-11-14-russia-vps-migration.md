@@ -23,28 +23,28 @@
 ### Task 1: Inventory and readiness
 
 - [x] Confirm SSH access to both VPSs and inspect new VPS resources, existing services, DNS and old proxy metadata.
-- [ ] Record migration baseline: old DB size/row counts, old app config keys, proxy URL format, DNS TTL and new VPS available resources.
-- [ ] Verify new IP marketplace connectivity and Telegram direct failure without secrets.
+- [x] Record migration baseline: old DB size/row counts, old app config keys, proxy URL format, DNS TTL and new VPS available resources.
+- [x] Verify new IP marketplace connectivity and Telegram direct failure without secrets.
 
 ### Task 2: Telegram proxy support
 
 **Files:** `backend/bot.py`, `backend/monitoring.py`, `backend/config.py`, `backend/requirements.txt`, tests.
 
-- [ ] Add optional `TELEGRAM_SOCKS_PROXY` to Bot API requests in bot and worker; keep direct path when unset.
-- [ ] Test both proxy and direct session selection without hitting live Telegram.
-- [ ] Transfer existing SOCKS5 credentials to new VPS only via private files and verify Bot API connectivity through proxy.
+- [x] Add optional `TELEGRAM_SOCKS_PROXY` to Bot API requests in bot and worker; keep direct path when unset.
+- [x] Test both proxy and direct session selection without hitting live Telegram.
+- [x] Transfer existing SOCKS5 credentials to new VPS only via private files and verify Bot API connectivity through proxy.
 
 ### Task 3: New server bootstrap and data transfer
 
-- [ ] Install Docker Compose, Nginx and Certbot; configure persistent swap and firewall with SSH retained.
-- [ ] Clone `feature/core-integration`, transfer `.env` privately, adjust deployment-only variables and proxy URL, and verify Compose config.
-- [ ] Make and retain a PostgreSQL dump on the old VPS; copy it to the new VPS and restore with table/row checks.
+- [x] Install Docker Compose, Nginx and Certbot; configure persistent swap and firewall with SSH retained.
+- [x] Clone `feature/core-integration`, transfer `.env` privately, adjust deployment-only variables and proxy URL, and verify Compose config.
+- [x] Make and retain a PostgreSQL dump on the old VPS; copy it to the new VPS and restore with table/row checks.
 - [ ] Start DB, API, web, worker and optional Chrome with resource limits; verify local health, logs and data.
 
 ### Task 4: HTTPS and singleton bot cutover
 
-- [ ] Confirm authoritative DNS points to `48.103.149.93`; configure Nginx and obtain certificate.
-- [ ] Verify public HTTPS routes and Telegram Mini App URL.
+- [x] Confirm authoritative DNS points to `48.103.149.93`; configure Nginx and obtain certificate.
+- [x] Verify public HTTPS routes and Telegram Mini App URL.
 - [ ] Stop only the old MarketFusion bot, start the new bot through SOCKS5, verify Bot API and user flow.
 - [ ] Verify real search, favorites, monitoring state and admin/session continuity; record marketplace source outcomes from new IP.
 

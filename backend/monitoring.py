@@ -132,10 +132,12 @@ async def check_watch(db, row, bot_token: str = "") -> None:
 
 async def _send_telegram(token: str, user_id: int, body: str) -> None:
     try:
-        async with aiohttp.ClientSession(connector=build_notification_connector()) as session:
+        connector = build_notification_connector()
+        timeout_seconds = 45 if connector is not None else 10
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.post(f"https://api.telegram.org/bot{token}/sendMessage",
                                     json={"chat_id": user_id, "text": body},
-                                    timeout=aiohttp.ClientTimeout(total=10)) as response:
+                                    timeout=aiohttp.ClientTimeout(total=timeout_seconds)) as response:
                 response.raise_for_status()
     except Exception:
         logger.warning("Telegram delivery failed for user %s", user_id)
