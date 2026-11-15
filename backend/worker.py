@@ -3,7 +3,7 @@ import asyncio
 import logging
 
 import config
-from monitoring import run_worker
+from catalog_v2.watches import run_worker
 from storage import create_database
 from storage.postgres import PostgresDatabase
 
