@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { request as v2Request } from './v2/api';
 import { comparePrices, createWatch, currentUser, deleteAiProvider, getAdminOverview, getAdminUsers, getAiProviders, getAiRoutes, getAuditEvents, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, setAdminUserRole, watchHistory, writeFavorite } from "./api";
 import type { AdminOverview, AdminUser, AuditEvent, AiProvider, AiRoute, MarketplaceOffer, MarketplaceSearch, Notification, PricePoint, Watch } from "./api";
 import type { BudgetInfo, CompareRow, Product, Review, SearchResult } from "./types";
@@ -869,5 +870,12 @@ function TabBar({ active, onTab }: { active: string; onTab: (t: string) => void 
 
 export function V2Admin({role}: {role:string}) {
   const [section,setSection]=useState('overview');
-  return <section className="legacy-admin"><h1>Управление сервисом</h1><div className="segmented"><button onClick={()=>setSection('overview')}>Сводка</button>{role==='super_admin'&&<><button onClick={()=>setSection('ai')}>Настройки ИИ</button><button onClick={()=>setSection('users')}>Пользователи</button></>}</div>{section==='overview'?<AdminOverviewScreen/>:role==='super_admin'&&section==='ai'?<AiAdminScreen/>:role==='super_admin'?<UsersAdminScreen/>:null}</section>;
+  return <section className="legacy-admin"><h1>Управление сервисом</h1><div className="segmented"><button onClick={()=>setSection('overview')}>Сводка</button><button onClick={()=>setSection('usage')}>Расход ИИ</button>{role==='super_admin'&&<><button onClick={()=>setSection('ai')}>Настройки ИИ</button><button onClick={()=>setSection('users')}>Пользователи</button></>}</div>{section==='overview'?<AdminOverviewScreen/>:section==='usage'?<UsagePanel/>:role==='super_admin'&&section==='ai'?<AiAdminScreen/>:role==='super_admin'?<UsersAdminScreen/>:null}</section>;
+}
+
+function UsagePanel() {
+  const [rows,setRows]=useState<{user_id:number|null;task:string;provider:string;model:string;input_tokens:number;output_tokens:number;calls:number}[]>([]);
+  const [error,setError]=useState('');
+  useEffect(()=>{v2Request<{usage:typeof rows}>('/api/v2/admin/usage').then(r=>setRows(r.usage)).catch(()=>setError('Не удалось получить статистику'));},[]);
+  return <section className="panel"><h2>Расход токенов за 30 дней</h2><p className="muted">Только фактические значения usage от провайдера. Стоимость в деньгах не рассчитывается без тарифов.</p>{error&&<p role="alert">{error}</p>}{!rows.length?<p className="muted">Измерений пока нет.</p>:<div className="table-scroll"><table><thead><tr><th>Пользователь</th><th>Задача</th><th>Провайдер / модель</th><th>Вход</th><th>Выход</th><th>Вызовы</th></tr></thead><tbody>{rows.map((r,i)=><tr key={i}><td>{r.user_id??'Не указан'}</td><td>{r.task}</td><td>{r.provider} / {r.model}</td><td>{r.input_tokens}</td><td>{r.output_tokens}</td><td>{r.calls}</td></tr>)}</tbody></table></div>}</section>;
 }

@@ -58,6 +58,12 @@ def _similar(a: str, b: str) -> float:
 
 def find_counterpart(target: Product, candidates: list[Product]) -> Product | None:
     """Ищет тот же товар в выдаче другой площадки (EAN → нечёткое название)."""
+    from catalog_v2.identity import identify, match_variant
+    identity=identify(target.title,brand=target.brand,gtin=target.ean or '')
+    candidates=[c for c in candidates if match_variant(identity,identify(c.title,brand=c.brand,gtin=c.ean or '')).status!='rejected']
+    exact=[c for c in candidates if c.marketplace!=target.marketplace and match_variant(identity,identify(c.title,brand=c.brand,gtin=c.ean or '')).status=='exact']
+    if exact:
+        return max(exact,key=lambda c:_similar(target.title,c.title))
     if target.ean:
         for c in candidates:
             if c.ean and c.ean == target.ean and c.marketplace != target.marketplace:
@@ -78,6 +84,12 @@ async def arbiter_confirm(llm: LLMGateway, a: Product, b: Product) -> ArbiterVer
     Названия идут из внешнего источника и санитизируются перед вставкой
     в промпт (ТЗ §4 — защита от инъекций).
     """
+    from catalog_v2.identity import identify, match_variant
+    decision=match_variant(identify(a.title,brand=a.brand,gtin=a.ean or ''),identify(b.title,brand=b.brand,gtin=b.ean or ''))
+    if decision.status=='exact':
+        return ArbiterVerdict(same=True,confidence=1,reason='; '.join(decision.reasons))
+    if decision.status=='rejected' or not llm.real:
+        return ArbiterVerdict(same=False,confidence=1,reason='; '.join(decision.reasons))
     prompt = (
         ARBITER_PROMPT
         + f"\n\nТОВАР A ({a.marketplace}): "
@@ -85,7 +97,8 @@ async def arbiter_confirm(llm: LLMGateway, a: Product, b: Product) -> ArbiterVer
         + f"ТОВАР B ({b.marketplace}): "
           f"{sanitize_item(b.title, 300)} | EAN: {b.ean or '—'}"
     )
-    return await llm.structured(kind="arbiter", prompt=prompt, schema=ArbiterVerdict)
+    advisory=await llm.structured(kind="arbiter", prompt=prompt, schema=ArbiterVerdict)
+    return ArbiterVerdict(same=False,confidence=advisory.confidence,reason=advisory.reason+'; идентичность не подтверждена структурными данными')
 
 
 def build_compare_result(a: Product, b: Product) -> CompareResult:

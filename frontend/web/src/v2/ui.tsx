@@ -19,7 +19,7 @@ export function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name]}</svg>;
 }
-export const sourceName = (source: string) => ({ wildberries: "Wildberries", wb: "Wildberries", yandex: "Яндекс Маркет", yandex_market: "Яндекс Маркет", ozon: "Ozon", dns: "DNS", citilink: "Ситилинк", megamarket: "Мегамаркет", avito: "Авито", lamoda: "Lamoda", aliexpress: "AliExpress", mvideo: "М.Видео" }[source] || source);
+export const sourceName = (source: string) => ({ wildberries: "Wildberries", wb: "Wildberries", yandex: "Яндекс Маркет", yandex_market: "Яндекс Маркет", ozon: "Ozon", dns: "DNS", citilink: "Ситилинк", megamarket: "Мегамаркет", avito: "Авито", lamoda: "Lamoda", aliexpress: "AliExpress", taobao: "Taobao", mvideo: "М.Видео" }[source] || source);
 export const money = (amount: number | null | undefined, currency = "RUB") => amount == null ? "Цена неизвестна" : new Intl.NumberFormat("ru-RU", { style: "currency", currency, maximumFractionDigits: amount % 100 ? 2 : 0 }).format(amount / 100);
 export const date = (value?: string | null, time = false) => !value ? "Ещё не проверено" : new Date(value).toLocaleString("ru-RU", { day: "numeric", month: "short", ...(time ? { hour: "2-digit", minute: "2-digit" } : {}) });
 export function confirmedTotal(offer: Offer, region: string): number | null {

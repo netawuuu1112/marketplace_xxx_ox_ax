@@ -102,6 +102,12 @@ def evaluate_rules(*, price, previous, threshold, rules, state, now,
             if delta > 0 and (delta >= rules[key] if key == "drop_amount" else delta * 100 >= anchor * rules[key]):
                 candidates.append(key)
     for key, baseline in (("historical_low", historic_min), ("low_30", low30), ("low_90", low90)):
+        window = {"low_30": 30, "low_90": 90}.get(key)
+        emitted_at = state.get(key + "_emitted_at", state.get("last_notified_at"))
+        if window and key + "_emitted" in state and (not emitted_at or now >= datetime.fromisoformat(emitted_at) + timedelta(days=window)):
+            state.pop(key + "_emitted", None)
+            state.pop(key + "_emitted_at", None)
+            state.pop(key + "_pending", None)
         if rules.get(key) and baseline is not None and price < baseline:
             state[key + "_pending"] = price
         pending = state.get(key + "_pending")
@@ -127,6 +133,7 @@ def evaluate_rules(*, price, previous, threshold, rules, state, now,
                 state[key + "_anchor"] = price
             elif key in ("historical_low", "low_30", "low_90"):
                 state[key + "_emitted"] = price
+                state[key + "_emitted_at"] = now.isoformat()
                 state.pop(key + "_pending", None)
             elif key == "back_in_stock":
                 state.pop("restock_pending", None)

@@ -1,5 +1,5 @@
 import pytest
-from catalog_v2.identity import identify, match_variant, normalize_query
+from catalog_v2.identity import identify, identity_key, match_variant, normalize_query
 from catalog_v2.models import DeliveryEstimate, MarketplaceOffer, compare_group, minor_units
 
 
@@ -41,3 +41,23 @@ def test_aliases_phone_capacity_and_identifiers():
     assert normalize_query('Samsng Galaxy S25 256GB')=='samsung galaxy s25 256gb'
     assert match_variant(identify('Айфон 16 про 256 натуральный титан'),identify('Apple iPhone 16 Pro 256GB natural titanium')).status=='exact'
     assert match_variant(identify('Kingston NV3 1TB',gtin='4006381333931'),identify('SSD',gtin='4006381333931')).status=='exact'
+
+
+@pytest.mark.parametrize('base,other', [
+    ('Samsung Galaxy S25 256GB','Samsung Galaxy S25+ 256GB'),
+    ('Samsung Galaxy S25 256GB','Screen protector Samsung Galaxy S25 256GB'),
+    ('Samsung Galaxy S25 256GB','Защитное стекло Samsung Galaxy S25 256GB'),
+    ('Kingston NV3 1TB 2230','Kingston NV3 1TB 2280'),
+    ('ASUS RTX 4070 Ti','ASUS RTX 4070 Ti SUPER'),
+])
+def test_known_modifications_and_accessories_cannot_merge(base,other):
+    a,b=identify(base),identify(other)
+    assert match_variant(a,b).status=='rejected'
+    assert identity_key(a)!=identity_key(b)
+
+
+def test_gtin_query_can_match_identifier_without_guessing_text():
+    query=identify('4006381333931')
+    assert query.gtin=='4006381333931'
+    assert match_variant(query,identify('SSD',gtin='4006381333931')).status=='exact'
+    assert identify('1234567890123').gtin==''  # Invalid checksum.

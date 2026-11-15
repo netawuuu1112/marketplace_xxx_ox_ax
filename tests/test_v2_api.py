@@ -44,3 +44,18 @@ def test_v2_http_auth_jobs_product_and_favorite_ownership(monkeypatch):
             assert (await client.patch('/api/v2/profile',json={'region':'Москва'},headers=headers(10))).status==200
             assert (await (await client.get('/api/v2/profile',headers=headers(11))).json())['region']==''
     asyncio.run(scenario())
+
+
+def test_cookie_mutations_reject_foreign_origin(monkeypatch):
+    monkeypatch.setattr(config,'API_TOKEN','')
+    monkeypatch.setenv('WEB_ADMIN_PASSWORD','fixture-password')
+    monkeypatch.setenv('WEB_SESSION_SECRET','fixture-session-secret')
+    async def scenario():
+        db=SimpleNamespace()
+        db._catalog_v2_service=SearchService(db,adapters={})
+        async with TestClient(TestServer(create_app(ApiContext(db,None,None,{})))) as client:
+            assert (await client.post('/api/auth/login',json={'password':'fixture-password'})).status==200
+            denied=await client.patch('/api/v2/profile',json={'region':'Other'},headers={'Origin':'https://foreign.example'})
+            assert denied.status==403
+            assert (await client.patch('/api/v2/profile',json={'region':'Москва'})).status==200
+    asyncio.run(scenario())

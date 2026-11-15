@@ -41,10 +41,11 @@ class LoggingMiddleware(BaseMiddleware):
     """Пишет в лог все входящие сообщения и колбэки."""
 
     async def __call__(self, handler, event: TelegramObject, data: dict):
-        if isinstance(event, Message):
-            logger.info("msg from %s: %s", event.from_user.id,
-                        (event.text or "[фото]" if event.photo else event.text)[:100])
-        elif isinstance(event, CallbackQuery):
-            logger.info("cb from %s: %s", event.from_user.id,
-                        (event.data or "")[:80])
-        return await handler(event, data)
+        from llm.usage import user_id
+        principal=getattr(getattr(event,'from_user',None),'id',None)
+        logger.info('Telegram %s from %s',type(event).__name__,principal)
+        token=user_id.set(principal)
+        try:
+            return await handler(event,data)
+        finally:
+            user_id.reset(token)

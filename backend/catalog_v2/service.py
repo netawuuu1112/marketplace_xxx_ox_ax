@@ -1,5 +1,6 @@
 """Shared bounded search jobs with incremental results and conservative grouping."""
 import asyncio
+from contextlib import asynccontextmanager
 from datetime import datetime,timezone
 from .identity import identify, identity_key, match_variant, normalize_query
 from .models import CatalogProduct, SearchRequest, SearchSnapshot, SourceStatus, compare_group
@@ -13,7 +14,30 @@ class SearchService:
         self.adapters=default_adapters() if adapters is None else adapters
         self.gate=asyncio.Semaphore(2)
         self.jobs={}
-        self.requests={}
+
+    @asynccontextmanager
+    async def _source_slot(self):
+        """Two V2 source operations across API, bot and worker processes."""
+        if not self.repository.persistent:
+            yield
+            return
+        pool=self.repository.db.pool
+        while True:
+            conn=await pool.acquire()
+            slot=None
+            try:
+                for candidate in range(2):
+                    if await conn.fetchval('SELECT pg_try_advisory_lock(824503,$1)',candidate):
+                        slot=candidate
+                        break
+                if slot is not None:
+                    yield
+                    return
+            finally:
+                if slot is not None:
+                    await asyncio.shield(conn.execute('SELECT pg_advisory_unlock(824503,$1)',slot))
+                await asyncio.shield(pool.release(conn))
+            await asyncio.sleep(.25)
 
     def register_source(self,name,adapter):
         """Operator/plugin hook for an authorized data API or independent agent."""
@@ -34,7 +58,6 @@ class SearchService:
         if not request.region: request=request.model_copy(update={'region':await self.repository.region(user_id)})
         query=normalize_query(request.query)
         snapshot=SearchSnapshot(query=request.query,normalized_query=query,sources=[SourceStatus(source=s,region=request.region) for s in dict.fromkeys(sources)])
-        self.requests[snapshot.search_id]=request
         await self.repository.save(user_id,snapshot)
         self.jobs[snapshot.search_id]=(user_id,asyncio.create_task(self._run(user_id,snapshot,request)))
         return snapshot.model_copy(deep=True)
@@ -79,7 +102,9 @@ class SearchService:
             match=re.search(r'/catalog/(\d+)/',parts.path)
             if match:
                 from wb_connector.server import wb_card
-                result=await asyncio.wait_for(wb_card(nm_ids=[int(match[1])]),timeout=45)
+                async with self.gate:
+                    async with self._source_slot():
+                        result=await asyncio.wait_for(wb_card(nm_ids=[int(match[1])]),timeout=45)
                 if result.items and result.items[0].name: return normalize_query(result.items[0].name)
         if len(slug)<3 or slug.isdigit() or slug in ('detail','search','product'):
             raise ValueError('Не удалось распознать товар из ссылки. Укажите название или модель.')
@@ -94,7 +119,9 @@ class SearchService:
                 snapshot.normalized_query=await self._resolve_link(request.query)
             async def run(source):
                 async with self.gate:
-                    try: return source,await asyncio.wait_for(self.adapters[source].search(snapshot.normalized_query,request.region),timeout=85)
+                    try:
+                        async with self._source_slot():
+                            return source,await asyncio.wait_for(self.adapters[source].search(snapshot.normalized_query,request.region),timeout=85)
                     except TimeoutError:
                         from .sources import SourceBatch
                         return source,SourceBatch(SourceStatus(source=source,status='timeout',detail='Источник не ответил вовремя',region=request.region),[])
@@ -109,7 +136,7 @@ class SearchService:
                 self._group(snapshot,request,accumulated)
                 await self.repository.save(user_id,snapshot)
             snapshot.status='complete'
-            snapshot.complete=bool(snapshot.groups) and all(s.status=='ok' for s in snapshot.sources)
+            snapshot.complete=all(s.status=='ok' for s in snapshot.sources)
             await self.repository.save(user_id,snapshot)
         except asyncio.CancelledError:
             for task in tasks: task.cancel()

@@ -16,6 +16,7 @@ BRANDS = ('kingston','samsung','apple','sony','xiaomi','lenovo','asus','acer','h
 
 def normalize_query(query: str) -> str:
     text = unicodedata.normalize('NFKC', query).casefold().replace('ё','е')
+    text = re.sub(r'(?<=\w)\s*\+', ' plus', text)
     text = re.sub(r'[\u200b-\u200f]', '', text)
     for source, target in ALIASES.items():
         text = re.sub(r'(?<!\w)' + re.escape(source) + r'(?!\w)', target, text)
@@ -31,7 +32,7 @@ def identify(title: str, *, brand: str = '', model: str = '', mpn: str = '', gti
     if not brand and 'iphone' in text: brand = 'apple'
     patterns = [r'\bnv[2-9]\b', r'\b(?:galaxy\s+)?s\d{2}(?:\s+(?:ultra|plus|fe))?\b',
         r'\biphone\s+\d{1,2}(?:\s+pro)?(?:\s+max|\s+plus|\s+mini)?\b', r'\bwh[ -]?1000xm\d\b',
-        r'\bredmi\s+note\s+\d+(?:\s+pro)?(?:\s+plus)?\b', r'\brtx\s*\d{4}(?:\s*ti)?\b']
+        r'\bredmi\s+note\s+\d+(?:\s+pro)?(?:\s+plus)?\b', r'\brtx\s*\d{4}(?:\s*ti)?(?:\s*super)?\b']
     if not model:
         model = next((m.group(0) for p in patterns if (m := re.search(p,text))), '')
     model = normalize_query(model).removeprefix('galaxy ')
@@ -49,10 +50,18 @@ def identify(title: str, *, brand: str = '', model: str = '', mpn: str = '', gti
         if raw in text: attrs.setdefault('color',color); break
     for pattern,key in [(r'(\d+)\s*(?:шт|pcs)\b','quantity'),(r'\bразмер\s+(\d+)\b','size')]:
         if m := re.search(pattern,text): attrs.setdefault(key,m.group(1))
-    if re.search(r'\b(?:чехол|кабель|адаптер|case|enclosure|корпус)\b',text): attrs['accessory']='yes'
+    # Retain the connector's broader accessory/bundle policy instead of
+    # treating a protective glass carrying the phone model as the phone.
+    from compare_connector.server import _looks_like_an_accessory
+    if _looks_like_an_accessory(title,'') or re.search(r'\b(?:кабель|адаптер|enclosure|корпус)\b',text):
+        attrs['accessory']='yes'
+    if re.search(r'\bssd\b|\bnv\d\b',text):
+        if factor := re.search(r'\b(2230|2242|2260|2280|22110)\b',text):
+            attrs.setdefault('form_factor',factor[1])
     if re.search(r'\b(?:бу|б/у|used|восстановлен\w*|refurbished)\b',text): condition='used'
     category = 'storage' if re.search(r'\bssd\b|\bnv\d\b',text) else 'phone' if re.search(r'iphone|galaxy|redmi|s\d{2}',model) else 'audio' if '1000xm' in model else 'other'
-    return ProductVariant(title=title, brand=brand, model=model, category=category, mpn=re.sub(r'[^a-z0-9]','',mpn.casefold()), gtin=normalize_gtin(gtin), attributes=attrs, condition=condition)
+    barcode=normalize_gtin(gtin) or (normalize_gtin(text) if text.isdigit() else '')
+    return ProductVariant(title=title, brand=brand, model=model, category=category, mpn=re.sub(r'[^a-z0-9]','',mpn.casefold()), gtin=barcode, attributes=attrs, condition=condition)
 
 
 class MatchDecision(BaseModel):

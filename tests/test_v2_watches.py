@@ -76,3 +76,28 @@ def test_unchanged_threshold_and_historical_lows_do_not_repeat_after_cooldown():
     assert fired == ["threshold", "historical_low"]
     assert rules(rules={"historical_low": True}, historic_min=490000,
                  state=state, now=now + timedelta(days=1))[0] == []
+
+
+@pytest.mark.parametrize('key,baseline,window',[('low_30','low30',30),('low_90','low90',90)])
+def test_rolling_low_rearms_when_previous_emitted_low_leaves_window(key,baseline,window):
+    now=datetime(2026,11,15,tzinfo=timezone.utc)
+    fired,state=rules(threshold=None,rules={key:True},now=now,**{baseline:500000})
+    assert fired==[key]
+    fired,state=rules(price=500000,previous=550000,threshold=None,rules={key:True},
+                      state=state,now=now+timedelta(days=window+1),**{baseline:550000})
+    assert fired==[key]
+    assert rules(price=500000,threshold=None,rules={key:True},state=state,
+                 now=now+timedelta(days=window+2),**{baseline:500000})[0]==[]
+
+
+def test_expired_rolling_low_keeps_pending_candidate_during_other_rule_cooldown():
+    now=datetime(2026,11,15,tzinfo=timezone.utc)
+    state={'low_30_emitted':490000,'low_30_emitted_at':(now-timedelta(days=40)).isoformat(),
+           'last_notified_at':now.isoformat()}
+    fired,state=rules(price=500000,threshold=None,rules={'low_30':True},low30=550000,
+                      state=state,now=now+timedelta(minutes=15))
+    assert fired==[] and state['low_30_pending']==500000
+    _,state=rules(price=500000,threshold=None,rules={'low_30':True},low30=500000,
+                  state=state,now=now+timedelta(minutes=30))
+    assert rules(price=500000,threshold=None,rules={'low_30':True},low30=500000,
+                 state=state,now=now+timedelta(minutes=61))[0]==['low_30']

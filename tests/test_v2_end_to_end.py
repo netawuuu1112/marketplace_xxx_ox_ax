@@ -16,6 +16,38 @@ from web import ApiContext,create_app
 import config
 
 
+def test_source_slots_are_shared_across_services_and_released_on_cancel():
+    base=os.getenv('MARKETFUSION_TEST_DATABASE_URL')
+    if not base: pytest.skip('isolated PostgreSQL required')
+    async def scenario():
+        pools=[await asyncpg.create_pool(base,min_size=1,max_size=4) for _ in range(2)]
+        services=[SearchService(SimpleNamespace(_pool=pool,pool=pool),adapters={}) for pool in pools]
+        active=maximum=0
+        async def operation(service):
+            nonlocal active,maximum
+            async with service._source_slot():
+                active+=1;maximum=max(maximum,active)
+                try: await asyncio.sleep(.03)
+                finally: active-=1
+        try:
+            await asyncio.wait_for(asyncio.gather(*(operation(services[i%2]) for i in range(6))),5)
+            assert maximum==2 and active==0
+            entered=asyncio.Event()
+            async def cancelled():
+                async with services[0]._source_slot():
+                    entered.set()
+                    await asyncio.Event().wait()
+            task=asyncio.create_task(cancelled())
+            await asyncio.wait_for(entered.wait(),2)
+            task.cancel();await asyncio.gather(task,return_exceptions=True)
+            maximum=0
+            await asyncio.wait_for(asyncio.gather(operation(services[1]),operation(services[1])),2)
+            assert maximum==2
+        finally:
+            for pool in pools: await pool.close()
+    asyncio.run(scenario())
+
+
 def test_http_search_watch_crossing_and_restart_persistence(monkeypatch):
     base=os.getenv('MARKETFUSION_TEST_DATABASE_URL')
     if not base: pytest.skip('isolated PostgreSQL required')
@@ -30,6 +62,25 @@ def test_http_search_watch_crossing_and_restart_persistence(monkeypatch):
         db=PostgresDatabase(url)
         try:
             await db.connect()
+            # A stable native listing may gain identifying attributes later.
+            from catalog_v2.identity import identify
+            from catalog_v2.models import MarketplaceOffer,SearchRequest,SearchSnapshot
+            from catalog_v2.repository import CatalogRepository
+            repository=CatalogRepository(db)
+            grouper=SearchService(db,adapters={})
+            identities=[]
+            for title in ('Kingston NV3','Kingston NV3 1TB'):
+                snapshot=SearchSnapshot(query=title,normalized_query=title)
+                offer=MarketplaceOffer(id='stable-native-offer',source='wildberries',native_id='stable',title=title,price=550000)
+                grouper._group(snapshot,SearchRequest(query=title),[(offer,identify(title))])
+                group=(snapshot.groups+snapshot.related)[0]
+                identities.append(group.product.id)
+                await repository.save(77,snapshot)
+            assert identities[0]!=identities[1]
+            enriched=await repository.product(77,identities[1])
+            assert len(enriched.offers)==1
+            assert enriched.offers[0].product_id==identities[1]
+            assert not (await repository.product(77,identities[0])).offers
             await db.pool.execute("INSERT INTO favorites(user_id,marketplace,ext_id,title,price,url,added) VALUES(10,'wb','legacy','Sony WH-1000XM5',5000,'https://www.wildberries.ru/catalog/1/detail.aspx',now()-interval '1 day')")
             class RegionalAdapter(Adapter):
                 async def search(self,query,region):
@@ -49,6 +100,8 @@ def test_http_search_watch_crossing_and_restart_persistence(monkeypatch):
                 await db._catalog_v2_service.jobs[sid][1]
                 result=await (await client.get('/api/v2/search/'+sid,headers=headers(10))).json()
                 pid=result['groups'][0]['product']['id']
+                invalid=await client.post('/api/v2/watches',json={'product_id':pid,'region':'Омск','threshold':500000},headers=headers(10))
+                assert invalid.status==400
                 response=await client.post('/api/v2/watches',json={'product_id':pid,'region':'Москва','threshold':500000},headers=headers(10))
                 assert response.status==201,await response.text()
                 watch=await response.json()

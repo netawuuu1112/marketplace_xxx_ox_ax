@@ -779,9 +779,12 @@ async def _run_compare(message: Message, text: str, *, user_id: int | None = Non
 
 def _legacy_catalog_product(group) -> Product | None:
     offer = next((o for o in group.offers if o.id == group.best_price_offer_id), None)
-    if offer is None or offer.source not in ("ozon", "yandex", "wb") or not getattr(offer, "native_id", ""):
+    if offer is None or not getattr(offer, "native_id", ""):
         return None
-    return Product(marketplace=offer.source, ext_id=offer.native_id, title=offer.title,
+    marketplace = {"ozon":"ozon", "yandex":"yandex", "yandex_market":"yandex", "wb":"wb", "wildberries":"wb"}.get(offer.source)
+    if marketplace is None:
+        return None
+    return Product(marketplace=marketplace, ext_id=offer.native_id, title=offer.title,
                    price=(offer.price or 0) // 100, url=offer.url, photo_url=offer.image_url or "",
                    rating=offer.rating)
 
@@ -1146,6 +1149,7 @@ async def main() -> None:
     dp.message.middleware(ThrottlingMiddleware())
     dp.message.middleware(LoggingMiddleware())
     dp.callback_query.middleware(ThrottlingMiddleware())
+    dp.callback_query.middleware(LoggingMiddleware())
 
     await db.connect()
     saved_profile = await db.get_setting("profile", config.LLM_PROFILE)

@@ -103,7 +103,7 @@ class SourceStatus(BaseModel):
     checked_at: str = Field(default_factory=now)
     region: str = ''
     supports_delivery: bool = False
-    supports_monitoring: bool = True
+    supports_monitoring: bool = False
 
 
 class ProductGroup(BaseModel):

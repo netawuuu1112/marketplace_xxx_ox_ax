@@ -36,7 +36,7 @@ class CatalogRepository:
                     await conn.execute('INSERT INTO mf_user_products(user_id,product_id) VALUES($1,$2) ON CONFLICT DO NOTHING',user_id,group.product.id)
                     for offer in group.offers:
                         checked_at=datetime.fromisoformat(offer.checked_at)
-                        await conn.execute('INSERT INTO mf_offers(id,product_id,variant_id,source,native_id,data,checked_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::timestamptz) ON CONFLICT(id) DO UPDATE SET data=excluded.data,checked_at=excluded.checked_at',offer.id,group.product.id,group.variant.id,offer.source,offer.native_id,offer.model_dump_json(),checked_at)
+                        await conn.execute('INSERT INTO mf_offers(id,product_id,variant_id,source,native_id,data,checked_at) VALUES($1,$2,$3,$4,$5,$6::jsonb,$7::timestamptz) ON CONFLICT(id) DO UPDATE SET product_id=excluded.product_id,variant_id=excluded.variant_id,source=excluded.source,native_id=excluded.native_id,data=excluded.data,checked_at=excluded.checked_at',offer.id,group.product.id,group.variant.id,offer.source,offer.native_id,offer.model_dump_json(),checked_at)
                         if group.match_status == 'exact' and offer.match_status == 'exact' and offer.price and offer.currency == 'RUB':
                             await conn.execute('INSERT INTO mf_price_observations(user_id,product_id,variant_id,offer_id,source,price,currency,region,captured_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9::timestamptz) ON CONFLICT DO NOTHING',user_id,group.product.id,group.variant.id,offer.id,offer.source,offer.price,offer.currency,offer.region,checked_at)
 

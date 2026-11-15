@@ -44,3 +44,47 @@ def test_owner_can_cancel_job_and_unknown_source_is_rejected():
         with pytest.raises(ValueError): await service.start(1,SearchRequest(query='ssd',sources=['evil']))
         await service.close()
     asyncio.run(scenario())
+
+
+def test_job_capacity_and_source_concurrency_are_bounded():
+    async def scenario():
+        current=maximum=0
+        gate=asyncio.Event()
+        class Slow(Adapter):
+            async def search(self,query,region):
+                nonlocal current,maximum
+                current+=1; maximum=max(current,maximum)
+                try: await gate.wait(); return await super().search(query,region)
+                finally: current-=1
+        class Broken(Adapter):
+            async def search(self,query,region): raise OSError('fixture error')
+        service=SearchService(SimpleNamespace(),adapters={'a':Slow('a'),'b':Broken('b')})
+        jobs=[await service.start(uid,SearchRequest(query='Kingston NV3 1TB')) for uid in range(5)]
+        await asyncio.sleep(.01)
+        with pytest.raises(RuntimeError): await service.start(6,SearchRequest(query='ssd'))
+        assert maximum<=2
+        gate.set()
+        await asyncio.gather(*(task for _,task in service.jobs.values()))
+        result=await service.snapshot(0,jobs[0].search_id)
+        assert result.groups and any(s.status=='unavailable' for s in result.sources)
+        await service.close()
+    asyncio.run(scenario())
+
+
+def test_marketplace_link_lookup_respects_existing_source_gate(monkeypatch):
+    from unittest.mock import AsyncMock
+    import wb_connector.server
+    lookup=AsyncMock(return_value=SimpleNamespace(items=[SimpleNamespace(name='Kingston NV3 1TB')]))
+    monkeypatch.setattr(wb_connector.server,'wb_card',lookup)
+    async def scenario():
+        service=SearchService(SimpleNamespace(),adapters={})
+        await service.gate.acquire();await service.gate.acquire()
+        task=asyncio.create_task(service._resolve_link('https://www.wildberries.ru/catalog/123/detail.aspx'))
+        await asyncio.sleep(.01)
+        lookup.assert_not_awaited()
+        service.gate.release()
+        assert await asyncio.wait_for(task,1)=='kingston nv3 1tb'
+        lookup.assert_awaited_once_with(nm_ids=[123])
+        service.gate.release()
+        await service.close()
+    asyncio.run(scenario())

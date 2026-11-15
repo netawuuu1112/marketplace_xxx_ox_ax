@@ -168,6 +168,20 @@ def test_catalog_results_preserve_existing_review_and_favorite_actions():
     assert any(c.startswith("fav:ozon:") for c in callbacks)
 
 
+@pytest.mark.parametrize('source,legacy', [('wildberries','wb'),('yandex_market','yandex'),('ozon','ozon')])
+def test_real_catalog_source_names_preserve_legacy_actions(source,legacy):
+    from keyboards import catalog_product_keyboard
+    offer=NS(id='offer',source=source,native_id='123',title='Kingston NV3 1TB',price=500000,
+             url='https://example.com/product/123',image_url=None,rating=4.7)
+    group=NS(product=NS(id='product'),offers=[offer],best_price_offer_id='offer')
+    product=bot._legacy_catalog_product(group)
+    assert product is not None and product.marketplace==legacy
+    keyboard=catalog_product_keyboard(group,legacy_product=product)
+    callbacks=[b.callback_data or '' for row in keyboard.inline_keyboard for b in row]
+    assert any(c.startswith('reviews:'+legacy+':') for c in callbacks)
+    assert any(c.startswith('fav:'+legacy+':') for c in callbacks)
+
+
 def test_catalog_search_edits_status_and_keeps_related_separate(monkeypatch):
     offer = NS(id="o1", source="wb", price=120050, currency="RUB", url="https://www.wildberries.ru/catalog/1/detail.aspx",
                match_status="exact", in_stock=True, condition="new", conditional_prices=[],
