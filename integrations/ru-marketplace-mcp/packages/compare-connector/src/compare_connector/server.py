@@ -1012,7 +1012,7 @@ async def _run_source(name: str, query: str, limit: int) -> tuple[SourceOutcome,
     """
     started = time.monotonic()
     try:
-        timeout_s = WB_SOURCE_TIMEOUT_S if name == "wildberries" else SOURCE_TIMEOUT_S
+        timeout_s = WB_SOURCE_TIMEOUT_S if name in ("wildberries", "dns") else SOURCE_TIMEOUT_S
         offers = await asyncio.wait_for(_SEARCH_IMPLS[name](query, limit), timeout=timeout_s)
     except TimeoutError:
         return (

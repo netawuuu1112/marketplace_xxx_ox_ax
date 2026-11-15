@@ -9,3 +9,5 @@
 - [x] Implement bounded observation and existing normalizer integration.
 - [ ] Verify tests and live public API after deployment.
 - [ ] Record remaining all-source access blockers and synchronize project memory.
+
+Additional verified defect: DNS's initial HTTP 401 browser-check page was closed too early. A bounded raw-CDP wait produced 24 real search results, but no prices. Added an opt-in DNS-only transport with completed-navigation checks and refusal preservation (3 tests); public deployment verification remains pending.

@@ -1,5 +1,9 @@
 # Errors and fixes
 
+## 2026-11-15 — DNS initial 401 and installed connector copies
+
+An initial DNS 401 could be the site's JavaScript browser check, not its final page. Keeping an owned raw-CDP tab alive allowed normal site navigation to finish and exposed 24 products (prices remain absent). Added opt-in DNS-only bounded navigation waiting; unresolved 401/429 and 403 still fail. Temporary probes must set PYTHONPATH when exercising repository-source files: most connector packages in the Docker image are installed copies in site-packages, so copying a file only under /app/integrations does not update runtime imports. Production changes require image replacement.
+
 ## 2026-11-15 — WB conditional search price and intermittent empty grid
 
 WB's JSON search endpoint returned HTTP 403 from the new VPS. Chrome search tiles exposed only WB Wallet prices, while a same-nmId card exposed an ordinary price separately. Added bounded card enrichment with exact id/type checks; a live repeat returned one ordinary WB price and a combined WB/Yandex query returned six priced offers. The initial post-deploy WB request still failed: Chrome showed the site shell but zero product tiles, and the connector reported `parser_drift`. Search-grid stability remains open; no price is fabricated on that path.

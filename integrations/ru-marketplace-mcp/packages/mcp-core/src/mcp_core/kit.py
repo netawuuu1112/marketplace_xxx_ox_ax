@@ -178,6 +178,7 @@ async def render_json(
     wait: Callable[[], Awaitable[None]],
     max_body_bytes: int,
     evaluate_timeout: float = 30.0,
+    browser_check: bool = False,
 ) -> dict[str, Any]:
     """Open ``url`` in the operator's Chrome, let the page settle, extract.
 
@@ -189,6 +190,10 @@ async def render_json(
     error rather than an empty result.
     """
     from mcp_core.transport.chrome_cdp import open_page
+
+    if browser_check:
+        from mcp_core.transport.browser_check import open_browser_check_page
+        open_page = open_browser_check_page
 
     async with lock:
         await wait()
