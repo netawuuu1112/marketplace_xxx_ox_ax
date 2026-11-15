@@ -7,7 +7,7 @@
 - [x] Verify a real Yandex Market price watch via worker and remove the temporary watch.
 - [x] Determine whether Wildberries product-card route can yield a confirmed ordinary price; add bounded same-nmId enrichment and verify one live ordinary price.
 - [x] Add client-side links to marketplace search pages for failed or unpriced sources; show review/compare API errors instead of a hanging or silent screen.
-- [ ] Deploy and verify this frontend update through the public HTTPS site and a browser interaction check.
+- [x] Deploy and verify this frontend update through the public HTTPS site and a browser interaction check (simulated error responses in browser; live marketplace access unchanged).
 - [ ] Stabilize Wildberries search grid access; one live request still returned no product tiles before a successful repeat.
 - [ ] Obtain permitted working access for blocked marketplaces within user constraints; retest each source.
 - [ ] Verify same-item cross-market comparison with at least two confirmed ordinary prices.

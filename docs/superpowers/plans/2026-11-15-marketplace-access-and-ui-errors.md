@@ -7,5 +7,5 @@
 - [x] Verify source URL shapes from existing connectors and current live source outcomes.
 - [x] Add encoded official search links for failed or unpriced sources.
 - [x] Fix asynchronous loading and error states in review and comparison screens.
-- [ ] Build the frontend and check links, HTTPS, API health, and deployed bundle on the VPS.
-- [ ] Update source status, project memory, commit, and deploy.
+- [x] Build the frontend and check links, HTTPS, API health, and deployed bundle on the VPS.
+- [x] Update source status, project memory, commit, and deploy.
