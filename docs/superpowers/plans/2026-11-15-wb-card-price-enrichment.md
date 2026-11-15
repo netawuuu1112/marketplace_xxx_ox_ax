@@ -34,7 +34,7 @@
 
 ### Task 3: Verify and deploy
 
-- [ ] Run focused and full tests, type/build checks where applicable, and Compose validation.
-- [ ] Deploy on the Russia VPS without changing PostgreSQL or starting a second bot.
-- [ ] Probe public signed WB and cross-market searches; confirm price kind, source outcomes and service health.
-- [ ] Update source status, README and `.memory`, commit and push; keep the PR draft while other sources remain blocked.
+- [x] Run focused and full tests, type/build checks where applicable, and Compose validation.
+- [x] Deploy on the Russia VPS without changing PostgreSQL or starting a second bot.
+- [x] Probe public signed WB and cross-market searches; confirm price kind, source outcomes and service health. One WB read failed before a successful repeat; stability remains open.
+- [x] Update source status, README and `.memory`, commit and push; keep the PR draft while other sources remain blocked.

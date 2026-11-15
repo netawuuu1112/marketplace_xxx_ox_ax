@@ -1,5 +1,13 @@
 # Errors and fixes
 
+## 2026-11-15 — WB conditional search price and intermittent empty grid
+
+WB's JSON search endpoint returned HTTP 403 from the new VPS. Chrome search tiles exposed only WB Wallet prices, while a same-nmId card exposed an ordinary price separately. Added bounded card enrichment with exact id/type checks; a live repeat returned one ordinary WB price and a combined WB/Yandex query returned six priced offers. The initial post-deploy WB request still failed: Chrome showed the site shell but zero product tiles, and the connector reported `parser_drift`. Search-grid stability remains open; no price is fabricated on that path.
+
+## 2026-11-15 — Isolated source failures
+
+Separate public authenticated requests showed DNS HTTP 401, Citilink HTTP 429, Lamoda HTTP 403, Ozon HTTP 403, Avito IP firewall, Taobao login/CAPTCHA, AliExpress zero recognized tiles, and Megamarket 45-second timeout. These occurred without all-source browser contention. Do not label them all as generic timeout or treat installing another parser as a fix.
+
 ## 2026-11-15 — Old Nginx bridge returned 502
 
 The bridge initially failed upstream certificate verification at depth 3 (error 20). Set `proxy_ssl_verify_depth 5` while retaining verification and SNI. Both the new direct HTTPS endpoint and the old bridge `/health` returned HTTP 200 afterward.

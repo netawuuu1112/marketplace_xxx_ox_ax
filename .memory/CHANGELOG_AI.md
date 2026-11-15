@@ -1,5 +1,9 @@
 # AI development changelog
 
+## 2026-11-15 — WB card price evidence and GitHub source research
+
+Changed `compare_connector.server`, `frontend/web/nginx.conf`, public probe, WB tests, source/research docs and project memory. The adapter now checks one Wallet-only WB search result against the same native product card and ranks only a `regular` price; WB source timeout is 80 seconds and web proxy timeout 120 seconds. Five focused tests failed before implementation and passed after it; full local suite passed 16 tests with 1 skipped. Built and deployed API, bot, worker and web on the Russia VPS. Public signed WB search first failed with zero product tiles, then returned 5 cards with 1 ordinary price; combined WB/Yandex search returned 10 cards with 6 ordinary prices. Isolated probes recorded eight other source failures. No other source was marked working.
+
 ## 2026-11-15 — Russia VPS migration and live watch probe
 
 Changed Telegram proxy transport, Docker dependency/config, Nginx bridge and cleanup templates, deployment probes, README, source status and project memory. Moved production to `48.103.149.93` with PostgreSQL and Chrome profile restored, HTTPS and singleton bot; removed the old Finland app while retaining SOCKS5. Verified matching DB counts, public signed auth/favorite, private Chrome, Yandex Market priced search, user-confirmed bot/Mini App, and a worker-recorded watch price with successful temporary-watch cleanup. Full all-source MVP remains open due to live source blocks/timeouts.

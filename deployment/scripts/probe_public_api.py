@@ -40,8 +40,10 @@ def main() -> None:
     print(json.dumps({"auth_role": me.get("role"), "favorites": len(favorites.get("products", []))}))
 
     sources = sys.argv[1] if len(sys.argv) > 1 else "yandex_market"
-    search = request("/api/marketplaces/search?" + urlencode({"q": "ssd", "sources": sources}), headers)
+    query = sys.argv[2] if len(sys.argv) > 2 else "ssd"
+    search = request("/api/marketplaces/search?" + urlencode({"q": query, "sources": sources}), headers)
     print(json.dumps({
+        "query": query,
         "complete": search.get("complete"),
         "total_offers": search.get("total_offers"),
         "outcomes": [
@@ -53,6 +55,10 @@ def main() -> None:
             for item in search.get("source_outcomes", [])
         ],
         "ordinary_prices": sum(offer.get("price_rub") is not None for offer in search.get("offers", [])),
+        "priced_offers": [{
+            "source": offer.get("source"), "product_id": offer.get("product_id"),
+            "price_rub": offer.get("price_rub"), "price_kind": offer.get("price_kind"),
+        } for offer in search.get("offers", []) if offer.get("price_rub") is not None],
         "first_offer_url": search.get("offers", [{}])[0].get("url") if search.get("offers") else None,
     }, ensure_ascii=False))
 
