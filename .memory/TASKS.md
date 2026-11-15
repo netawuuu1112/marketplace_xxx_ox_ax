@@ -9,8 +9,9 @@
 - [x] Add client-side links to marketplace search pages for failed or unpriced sources; show review/compare API errors instead of a hanging or silent screen.
 - [x] Deploy and verify this frontend update through the public HTTPS site and a browser interaction check (simulated error responses in browser; live marketplace access unchanged).
 - [ ] Stabilize Wildberries search grid access; one live request still returned no product tiles before a successful repeat.
-- [ ] Deploy and live-verify WB current-page search JSON observation; three new price semantics tests pass.
-- [ ] Deploy and public-verify DNS browser-check waiting; direct connector returns 24 products without prices. Investigate DNS price-loading request separately.
+- [x] Deploy and live-verify WB current-page search JSON observation: public `ssd` and `kingston nv3` each returned five ordinary prices.
+- [x] Deploy and public-verify DNS browser-check waiting: five real cards, zero prices.
+- [ ] Restore DNS price loading; documented AjaxState product-buy registration was absent from the current page.
 - [ ] Obtain permitted working access for blocked marketplaces within user constraints; retest each source.
 - [ ] Verify same-item cross-market comparison with at least two confirmed ordinary prices.
 - [ ] Verify end-to-end monitoring, alerts, AI analysis, photo search, admin and bot flows.

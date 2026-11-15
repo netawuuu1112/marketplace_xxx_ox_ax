@@ -60,6 +60,7 @@ def main() -> None:
             "price_rub": offer.get("price_rub"), "price_kind": offer.get("price_kind"),
         } for offer in search.get("offers", []) if offer.get("price_rub") is not None],
         "first_offer_url": search.get("offers", [{}])[0].get("url") if search.get("offers") else None,
+        "first_offer_title": search.get("offers", [{}])[0].get("title") if search.get("offers") else None,
     }, ensure_ascii=False))
 
 

@@ -1,5 +1,9 @@
 # AI development changelog
 
+## 2026-11-15 — WB search JSON and DNS browser check
+
+Observed live WB search JSON through an owned raw-CDP tab; normalized ordinary prices with existing API rules, exact query/page/origin matching, and DOM fallback. Public deployed `ssd` and `kingston nv3` each returned five ordinary WB prices. Allowed DNS's initial 401 browser check to complete within a bound; public search returned five real cards without prices. Added six focused tests; total local suite passed 22 tests with 1 skipped. Rebuilt WB images and applied a connector-only DNS/core/compare image layer; API, bot and worker share the verified image. Full all-source MVP remains open; seven sources lack a working data path and DNS prices are absent.
+
 ## 2026-11-15 — WB card price evidence and GitHub source research
 
 Changed `compare_connector.server`, `frontend/web/nginx.conf`, public probe, WB tests, source/research docs and project memory. The adapter now checks one Wallet-only WB search result against the same native product card and ranks only a `regular` price; WB source timeout is 80 seconds and web proxy timeout 120 seconds. Five focused tests failed before implementation and passed after it; full local suite passed 16 tests with 1 skipped. Built and deployed API, bot, worker and web on the Russia VPS. Public signed WB search first failed with zero product tiles, then returned 5 cards with 1 ordinary price; combined WB/Yandex search returned 10 cards with 6 ordinary prices. Isolated probes recorded eight other source failures. No other source was marked working.
