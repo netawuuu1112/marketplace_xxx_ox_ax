@@ -887,6 +887,21 @@ async def _wb_card_dom(
     )
 
 
+def _observed_search_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    """Normalize the current page's own search response using the existing API price rules."""
+    products = payload.get("observed_products")
+    if not isinstance(products, list):
+        return []
+    items = []
+    for product in products[:100]:
+        if not isinstance(product, dict) or not isinstance(product.get("id"), int) or isinstance(product["id"], bool) or product["id"] <= 0:
+            continue
+        item = _card_item_dict(product)
+        item.update(price_kind="regular", wallet_price_rub=None, transport="dom")
+        items.append(item)
+    return items
+
+
 async def _wb_search_dom(
     query: str,
     dest: str,
@@ -901,6 +916,10 @@ async def _wb_search_dom(
         await ctx.debug(f"wb_search[dom]: {url}")
     payload = await dom_transport.render(url, dom_transport.SEARCH_EXTRACT_JS, "search")
     items, warnings = dom_transport.parse_search_page(payload)
+    observed = _observed_search_items(payload)
+    if observed:
+        items = observed
+        warnings = ["info: prices read from the current page's own search JSON; region is the browser's region"]
     if not items and not payload.get("page_says_empty"):
         # An empty page without WB's own «ничего не нашлось» means the tile
         # selectors stopped matching; reporting no_results with healthy=True

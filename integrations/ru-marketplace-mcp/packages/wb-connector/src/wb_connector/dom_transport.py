@@ -703,6 +703,57 @@ _dom_cache: TTLCache[dict[str, Any]] = TTLCache(ttl_s=_settings.cache_ttl, max_e
 _dom_lock = asyncio.Lock()
 _last_nav = 0.0
 
+# Observe only the site's successful response for this exact query and page.
+# Keep public catalog fields only, excluding opaque request payloads and tokens.
+SEARCH_OBSERVER_JS = r"""
+(() => {
+  const expected = new URL(location.href);
+  const query = expected.searchParams.get('search');
+  if (!query) return;
+  const page = Number(expected.searchParams.get('page') || 1);
+  window.__mfSearchProducts = null;
+  const original = window.fetch;
+  window.fetch = async function(...args) {
+    const response = await original.apply(this, args);
+    const url = new URL(response.url);
+    if (response.status === 200 && url.origin === location.origin &&
+        /^\/__internal\/u-search\/exactmatch\/.+\/search$/.test(url.pathname) &&
+        url.searchParams.get('query') === query && Number(url.searchParams.get('page') || 1) === page) {
+      response.clone().json().then(data => {
+        const products = data.products || data.data?.products;
+        if (!Array.isArray(products) || !products.length || products.length > 1000) return;
+        window.__mfSearchProducts = products.slice(0,100).map(p => ({
+          id:p.id, name:p.name, brand:p.brand, supplier:p.supplier,
+          supplierId:p.supplierId, supplierRating:p.supplierRating,
+          reviewRating:p.reviewRating, feedbacks:p.feedbacks, totalQuantity:p.totalQuantity,
+          sizes:Array.isArray(p.sizes) ? p.sizes.slice(0,100).map(s => ({price:s?.price})) : []
+        }));
+      }).catch(() => {});
+    }
+    return response;
+  };
+})();
+"""
+
+
+async def _render_observed_search(url: str, extract_js: str) -> tuple[dict[str, Any], Any]:
+    from mcp_core.transport.chrome_cdp import NavBlocked, _raw_cdp_page, _check_final_host
+
+    async with _raw_cdp_page("about:blank", 0) as page:
+        await page._send("Page.addScriptToEvaluateOnNewDocument", {"source": SEARCH_OBSERVER_JS})
+        status = await page.goto_and_status(url, navigation_timeout_ms=20000)
+        if status in (401, 403, 429) or status is not None and status >= 500:
+            raise NavBlocked(status, url)
+        _check_final_host(page.url, ALLOWED_HOSTS)
+        probe = await _wait_ready(page, "search", url)
+        raw = await asyncio.wait_for(page.evaluate(extract_js), timeout=15)
+        observed = await asyncio.wait_for(page.evaluate("JSON.stringify(window.__mfSearchProducts || [])"), timeout=5)
+        data = json.loads(raw)
+        products = json.loads(observed)
+        if isinstance(data, dict) and isinstance(products, list):
+            data["observed_products"] = products
+        return probe, json.dumps(data, ensure_ascii=False)
+
 
 async def _gap() -> None:
     wait = _settings.dom_min_gap - (time.monotonic() - _last_nav)
@@ -804,9 +855,12 @@ async def render(url: str, extract_js: str, want: str) -> dict[str, Any]:
     async with _dom_lock:
         await _gap()
         try:
-            async with open_page(url, wait_ms=_settings.dom_settle_ms, allowed_hosts=ALLOWED_HOSTS) as page:
-                probe = await _wait_ready(page, want, url)
-                raw = await asyncio.wait_for(page.evaluate(extract_js), timeout=30.0)
+            if want == "search":
+                probe, raw = await _render_observed_search(url, extract_js)
+            else:
+                async with open_page(url, wait_ms=_settings.dom_settle_ms, allowed_hosts=ALLOWED_HOSTS) as page:
+                    probe = await _wait_ready(page, want, url)
+                    raw = await asyncio.wait_for(page.evaluate(extract_js), timeout=30.0)
         except NavBlocked as exc:
             log_event("wb_dom.nav_blocked", status=exc.status)
             raise_tool_error(
@@ -842,6 +896,6 @@ def _usable(data: dict[str, Any], want: str) -> bool:
     """Cache only a render that carries what the parser needs; a half-rendered page must be re-read."""
     if want == "search":
         tiles = data.get("tiles")
-        return isinstance(tiles, list) and bool(tiles)
+        return isinstance(tiles, list) and bool(tiles) or bool(data.get("observed_products"))
     lines = data.get("lines")
     return isinstance(lines, list) and any(isinstance(x, str) and x.startswith("Артикул") for x in lines)
