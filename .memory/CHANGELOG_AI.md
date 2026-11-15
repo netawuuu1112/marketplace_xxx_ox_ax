@@ -1,5 +1,9 @@
 # AI development changelog
 
+## 2026-11-15 ? V2 implementation and local verification
+
+Changed backend/catalog_v2, migrations/storage, bot/keyboards/middlewares/worker/matcher/LLM usage, frontend V2 and preserved LegacyWorkspace, tests/CI, isolated staging scripts, README and docs. Added conservative structured identity, partial bounded search, comparison/delivery, owner-scoped persistence, product-bound watches/seven rules/outbox, new Telegram/Web UX and measured AI usage. Independent review defects were reproduced then fixed with regressions (canonical source aliases, S25+, accessories/form factors, GTIN, relational offer reclassification, rolling lows and link concurrency). Final local suite: 82 passed including isolated real PG; 4 fixture browser scenarios; TypeScript/Vite and compileall passed; npm audit 0 vulnerabilities. Docker rebuilt; real local login/four-tabs/admin smoke and empty-schema pg_dump/restore counters verified. No production deployment or live marketplace/bot/paid LLM calls during V2 work. External access, region/delivery, full VPS load and live acceptance remain open; report and release/rollback instructions describe these limits.
+
 ## 2026-11-15 — WB search JSON and DNS browser check
 
 Observed live WB search JSON through an owned raw-CDP tab; normalized ordinary prices with existing API rules, exact query/page/origin matching, and DOM fallback. Public deployed `ssd` and `kingston nv3` each returned five ordinary WB prices. Allowed DNS's initial 401 browser check to complete within a bound; public search returned five real cards without prices. Added six focused tests; total local suite passed 22 tests with 1 skipped. Rebuilt WB images and applied a connector-only DNS/core/compare image layer; API, bot and worker share the verified image. Full all-source MVP remains open; seven sources lack a working data path and DNS prices are absent.

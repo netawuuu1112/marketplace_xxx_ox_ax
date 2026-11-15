@@ -1,5 +1,9 @@
 # Errors and fixes
 
+## 2026-11-15 ? V2 independent review regressions
+
+Phone '+' variants, screen protectors, SSD form factors and GPU SUPER suffixes could collapse into exact groups because extraction omitted their distinguishing markers. Added plus normalization, shared connector accessory policy and distinguishing attributes; numeric checksum-valid GTIN queries now carry identity. Stable native offer enrichment changed JSON identity without relational mf_offers product_id/variant_id: upsert now updates both, verified by actual PG old/new product reads. Rolling-window minima retained permanent emitted bounds and lost pending candidates during cooldown: emitted timestamps age bounds once and retain new pending state. Canonical wildberries/yandex_market names were missing legacy bot actions: explicit alias mapping restores them. WB URL resolution now uses the same local/distributed source gates. Regression tests failed before fixes and passed afterward; do not infer untested universal category coverage from these examples.
+
 ## 2026-11-15 — DNS initial 401 and installed connector copies
 
 An initial DNS 401 could be the site's JavaScript browser check, not its final page. Keeping an owned raw-CDP tab alive allowed normal site navigation to finish and exposed 24 products (prices remain absent). Added opt-in DNS-only bounded navigation waiting; unresolved 401/429 and 403 still fail. Temporary probes must set PYTHONPATH when exercising repository-source files: most connector packages in the Docker image are installed copies in site-packages, so copying a file only under /app/integrations does not update runtime imports. Production changes require image replacement.
