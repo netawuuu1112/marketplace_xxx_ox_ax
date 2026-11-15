@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 
 def request(path: str, headers: dict[str, str]) -> dict:
     url = "https://marketfusionai.kosmo-connect.ru" + path
-    with urlopen(Request(url, headers=headers), timeout=75) as response:
+    with urlopen(Request(url, headers=headers), timeout=110) as response:
         return json.load(response)
 
 
