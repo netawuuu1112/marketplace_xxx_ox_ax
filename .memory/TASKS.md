@@ -6,7 +6,7 @@
 - [x] Implement/test domain identity, partial search, owner-scoped API, product-bound watches and migrations.
 - [x] Implement/test single-message Telegram UX and mobile V2 components.
 - [x] Review integration edges; run isolated staging/empty-schema restore, browser checks and document exact remaining live/load gaps.
-- [ ] Commit logical stages, push feature/marketfusion-v2, open PR to feature/core-integration.
+- [x] Commit logical stages, push feature/marketfusion-v2, open draft PR #9 to feature/core-integration; four GitHub CI jobs passed on 5a79c08.
 - [ ] Obtain separate owner permission before any V2 production deployment.
 - [ ] Confirm external source/region/delivery support and live end-to-end acceptance separately from fixture checks.
 

@@ -13,7 +13,13 @@
 - [x] Product-bound watches, seven alert conditions, leases, history, event deduplication and outbox.
 - [x] Telegram single welcome/menu button, text/photo/link routing, contextual callbacks and V2 results.
 - [x] Mini App tokens/themes, four tabs, incremental search, filters/sort, product/offer/history/watch flows and protected admin.
-- [ ] Regression/integration/browser verification, staging configuration, rollback/backups instructions and final source matrix.
-- [ ] Logical commits, GitHub PR against feature/core-integration; keep production unchanged pending owner permission.
+- [x] Regression/integration/browser verification, staging configuration, rollback/backups instructions and final source matrix.
+- [x] Logical commits, GitHub PR against feature/core-integration; keep production unchanged pending owner permission.
 
 Local gates: 82 Python tests including real isolated PostgreSQL; four offline UI scenarios; TypeScript/Vite/compileall; npm audit zero; real Docker API smoke and empty-schema restore. Independent review fixes covered by red/green regressions. See verification report for exact scope. Full-stack production load, live V2 external integrations, regional prices/delivery and owner production approval remain open; these are not checked off by fixture tests.
+
+Published draft PR #9: https://github.com/netawuuu1112/marketplace_xxx_ox_ax/pull/9. GitHub Actions run43752255039 passed all four jobs on code SHA5a79c08.
+
+- [ ] External source/region/delivery data and live V2 acceptance.
+- [ ] Full-stack VPS load and real production backup recovery check.
+- [ ] Separate owner release permission under specification section14.

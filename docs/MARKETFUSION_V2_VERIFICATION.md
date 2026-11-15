@@ -2,6 +2,8 @@
 
 Ветка `feature/marketfusion-v2`, исходный commit `c2042cc`, целевая ветка PR — `feature/core-integration`. Production не обновлялся. Полное ТЗ: [требования](MARKETFUSION_V2_REQUIREMENTS_RU.md), [аудит](MARKETFUSION_V2_AUDIT.md), [API](MARKETFUSION_V2_API.md), [запуск и откат](MARKETFUSION_V2_RELEASE.md).
 
+Опубликован [черновой PR №9](https://github.com/netawuuu1112/marketplace_xxx_ox_ax/pull/9). Удалённый [GitHub Actions run 43752255039](https://github.com/netawuuu1112/marketplace_xxx_ox_ax/actions/runs/43752255039) на code SHA `5a79c08` успешно выполнил все четыре задания: backend с PostgreSQL, frontend с браузерными сценариями, Compose и расширение.
+
 ## Реализовано
 
 - Единые модели товара, варианта, предложения и доставки; деньги в целых копейках, валюта отдельно. Нормализация русских названий и ограниченных опечаток. Конфликты модели, объёма, цвета, комплектации и состояния исключают точное совпадение; текстовое сходство само по себе его не доказывает. Достоверность зависит от полноты данных источника; универсальное распознавание всех категорий не заявляется.
