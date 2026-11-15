@@ -85,7 +85,7 @@ export default function App() {
             onFav={saveFav}
             onProduct={(p) => go({ name: "product", product: p })}
             onCompare={(q) => {
-              comparePrices(q).then((rows) => go({ name: "compare", rows, query: q }));
+              go({ name: "compare", rows: [], query: q });
             }}
             onReviews={(p) => go({ name: "reviews", product: p })}
           />
@@ -98,15 +98,13 @@ export default function App() {
             onFav={() => saveFav(screen.product)}
             onReviews={() => go({ name: "reviews", product: screen.product })}
             onCompare={(q) => {
-              comparePrices(q).then((rows) => go({ name: "compare", rows, query: q }));
+              go({ name: "compare", rows: [], query: q });
             }}
           />
         )}
         {screen.name === "reviews" && <ReviewsScreen product={screen.product} />}
         {screen.name === "compare" && (
-          <CompareScreen rows={screen.rows} query={screen.query} onSearch={(q) => {
-            comparePrices(q).then((rows) => go({ name: "compare", rows, query: q }));
-          }} />
+          <CompareScreen key={screen.query} rows={screen.rows} query={screen.query} onSearch={comparePrices} />
         )}
         {screen.name === "favorites" && (
           <FavoritesScreen items={favorites} onProduct={(p) => go({ name: "product", product: p })} />
@@ -281,6 +279,27 @@ function sourceStatus(source: string, status: string): string {
   return `${name}: поиск пока не выполнен`;
 }
 
+const SOURCE_SEARCH: Record<string, { name: string; base: string; param: string }> = {
+  ozon: { name: "Ozon", base: "https://www.ozon.ru/search/", param: "text" },
+  wildberries: { name: "Wildberries", base: "https://www.wildberries.ru/catalog/0/search.aspx", param: "search" },
+  yandex_market: { name: "Яндекс Маркет", base: "https://market.yandex.ru/search", param: "text" },
+  avito: { name: "Авито", base: "https://www.avito.ru/rossiya", param: "q" },
+  taobao: { name: "Taobao", base: "https://s.taobao.com/search", param: "q" },
+  megamarket: { name: "Мегамаркет", base: "https://megamarket.ru/catalog/?type=products", param: "q" },
+  lamoda: { name: "Lamoda", base: "https://www.lamoda.ru/catalogsearch/result/", param: "q" },
+  dns: { name: "DNS", base: "https://www.dns-shop.ru/search/", param: "q" },
+  citilink: { name: "Ситилинк", base: "https://www.citilink.ru/search/", param: "text" },
+  aliexpress: { name: "AliExpress", base: "https://aliexpress.ru/wholesale", param: "SearchText" },
+};
+
+function sourceSearchUrl(source: string, query: string): string | null {
+  const spec = SOURCE_SEARCH[source];
+  if (!spec) return null;
+  const url = new URL(spec.base);
+  url.searchParams.set(spec.param, query);
+  return url.toString();
+}
+
 function MarketplaceResults({ result, isFav, onFav }: {
   result: MarketplaceSearch;
   isFav: (p: Product) => boolean;
@@ -308,6 +327,17 @@ function MarketplaceResults({ result, isFav, onFav }: {
       {result.source_outcomes.filter((s) => s.status !== "ok").map((s) => (
         <p className="hint" key={s.source}>{sourceStatus(s.source, s.status)}</p>
       ))}
+      {result.source_outcomes.filter((s) => s.status !== "ok" || !pricedSources.has(s.source)).length > 0 && (
+        <div className="card">
+          <p className="hint">Если серверу не удалось получить цену, можно открыть поиск на площадке. Цена на сайте может отличаться от показанной здесь.</p>
+          <div className="card-actions">
+            {result.source_outcomes.filter((s) => s.status !== "ok" || !pricedSources.has(s.source)).map((s) => {
+              const href = sourceSearchUrl(s.source, result.query);
+              return href && <a className="btn-outline" key={s.source} href={href} target="_blank" rel="noopener noreferrer">Открыть {SOURCE_SEARCH[s.source].name}</a>;
+            })}
+          </div>
+        </div>
+      )}
       {result.offers.map((offer, index) => {
         const product = productFromOffer(offer);
         return <article className="card" key={`${offer.source}:${offer.product_id}:${index}`}>
@@ -440,15 +470,19 @@ function ProductScreen({ product: p, favored, onFav, onReviews, onCompare }: {
 function ReviewsScreen({ product: p }: { product: Product }) {
   const [reviews, setReviews] = useState<Review[] | null>(null);
   const [open, setOpen] = useState<Review | null>(null);
+  const [error, setError] = useState("");
 
   useEffect(() => {
-    getReviews(p).then(setReviews);
+    setReviews(null);
+    setError("");
+    getReviews(p).then(setReviews).catch(() => setError("Не удалось загрузить отзывы с площадки."));
   }, [p]);
 
   return (
     <div className="reviews">
       <h2>{p.title}</h2>
-      {!reviews && <p className="hint">Читаю отзывы…</p>}
+      {!reviews && !error && <p className="hint">Читаю отзывы…</p>}
+      {error && <p className="error">{error} <a href={p.url} target="_blank" rel="noopener noreferrer">Открыть товар</a></p>}
       {reviews?.length === 0 && <p className="hint">Отзывов пока нет.</p>}
       <div className="review-list">
         {reviews?.map((r) => (
@@ -484,20 +518,32 @@ function ReviewsScreen({ product: p }: { product: Product }) {
 function CompareScreen({ rows, query, onSearch }: {
   rows: CompareRow[];
   query: string;
-  onSearch: (q: string) => void;
+  onSearch: (q: string) => Promise<CompareRow[]>;
 }) {
   const [q, setQ] = useState(query);
   const [busy, setBusy] = useState(false);
+  const [currentRows, setCurrentRows] = useState(rows);
+  const [error, setError] = useState("");
+  const search = useCallback(async (value: string) => {
+    if (!value.trim()) return;
+    setBusy(true);
+    setError("");
+    try { setCurrentRows(await onSearch(value)); }
+    catch { setError("Не удалось сравнить цены. Попробуйте поиск по площадкам на главной странице."); }
+    finally { setBusy(false); }
+  }, [onSearch]);
+  useEffect(() => { if (query.trim()) void search(query); }, [query, search]);
   return (
     <div className="compare">
       <div className="search-box">
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Что сравнить?" />
-        <button className="btn-primary" disabled={busy} onClick={async () => { setBusy(true); await onSearch(q); setBusy(false); }}>
+        <button className="btn-primary" disabled={busy} onClick={() => void search(q)}>
           {busy ? "…" : "⚖️"}
         </button>
       </div>
-      {rows.length === 0 && <p className="hint">Введите название товара — сравним цены на Ozon и Яндекс Маркете.</p>}
-      {rows.map((r, i) => (
+      {error && <p className="error">{error}</p>}
+      {!busy && currentRows.length === 0 && !error && <p className="hint">Подтверждённых совпадений с двумя обычными ценами пока нет.</p>}
+      {currentRows.map((r, i) => (
         <article className="card" key={i}>
           <h3>{r.title}</h3>
           <div className="compare-row">

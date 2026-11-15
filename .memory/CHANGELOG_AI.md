@@ -15,3 +15,8 @@ Changed `deployment/chrome/*`, `docker-compose.browser.yml`, `backend/Dockerfile
 ## 2026-11-14 — Explicit price coverage warning
 
 Changed `frontend/web/src/App.tsx` and `frontend/web/src/api.ts` to show when a source returned products without ordinary prices. TypeScript and Vite build passed locally; rebuilt the web image on VPS and verified the public asset hash matches the local build. Live WB repeat exposed intermittent page navigation; doctor still reports card parser drift.
+# 2026-11-15: Marketplace navigation and error states
+
+- Added encoded direct search links for each source that failed or returned no ordinary price in the Mini App's marketplace results.
+- Made review loading failure visible and kept comparison loading active until the real API response; comparison failures now appear on the screen.
+- Documented that these client links do not restore automatic price data from blocked sources. Deployment verification is recorded separately in CURRENT_STATE.md.
