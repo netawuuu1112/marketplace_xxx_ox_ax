@@ -91,6 +91,8 @@ class OpenAICompatProvider:
             else:
                 raise ProviderError(f"{type(exc).__name__}: {exc}") from exc
 
+        from llm.usage import report
+        await report(self.name, model, kind, getattr(resp, 'usage', None))
         raw = (resp.choices[0].message.content or "").strip()
         try:
             parsed = _extract_json(raw)
