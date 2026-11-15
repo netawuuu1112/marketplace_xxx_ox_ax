@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title data-i18n="pageTitle"></title>
+<link rel="stylesheet" href="page.css">
+</head>
+<body>
+<div id="app">
+
+  <aside id="sidebar">
+    <div class="side-head">
+      <svg viewBox="0 0 26 26" fill="none" aria-hidden="true"><rect x="1" y="1" width="24" height="24" rx="7" fill="#2783DE"/><path d="M7 15.5 11 11l3 3 5-6" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <span data-i18n="appName"></span>
+    </div>
+    <nav id="folders"></nav>
+    <div class="side-new">
+      <input id="new-folder" type="text" data-i18n-placeholder="newFolder" maxlength="40">
+      <button id="btn-add-folder" data-i18n-title="createFolder" data-i18n-aria="createFolder">+</button>
+    </div>
+    <div class="side-wb">
+      <label class="side-wb-label">
+        <span data-i18n="wbDestLabel"></span>
+        <input id="wb-dest" type="text" maxlength="16" data-i18n-placeholder="wbDestPh">
+      </label>
+      <p class="side-hint muted" data-i18n="wbDestHint"></p>
+    </div>
+    <div class="side-foot"><span id="version"></span></div>
+  </aside>
+
+  <main id="main">
+    <div id="toolbar">
+      <input id="search" type="search" data-i18n-placeholder="searchPlaceholder" data-i18n-aria="searchAria">
+      <select id="sort" data-i18n-aria="sortAria">
+        <option value="added-desc" data-i18n="sortNewest"></option>
+        <option value="added-asc" data-i18n="sortOldest"></option>
+        <option value="title" data-i18n="sortTitle"></option>
+        <option value="price-asc" data-i18n="sortPriceAsc"></option>
+        <option value="price-desc" data-i18n="sortPriceDesc"></option>
+        <option value="change-asc" data-i18n="sortDrop"></option>
+        <option value="change-desc" data-i18n="sortRise"></option>
+        <option value="custom" data-i18n="sortCustom"></option>
+      </select>
+      <select id="store" data-i18n-aria="allStores"></select>
+      <button id="btn-select" data-i18n-title="selectVisibleTitle" data-i18n="selectVisible"></button>
+      <button id="btn-check" class="primary" data-i18n="checkAll"></button>
+    </div>
+    <div id="bulkbar" hidden>
+      <span id="bulk-count"></span>
+      <select id="bulk-folder" data-i18n-aria="bulkFolderAria"></select>
+      <button id="bulk-move" data-i18n="bulkMove"></button>
+      <button id="bulk-check" data-i18n="bulkRefresh"></button>
+      <button id="bulk-delete" data-i18n="untrack"></button>
+      <button id="bulk-cancel" data-i18n="bulkCancel"></button>
+    </div>
+    <div id="list"></div>
+    <div id="empty" hidden>
+      <p><b data-i18n="emptyPageTitle"></b></p>
+      <p class="muted" data-i18n="emptyPageHint"></p>
+    </div>
+  </main>
+
+  <aside id="detail" hidden>
+    <div class="d-head">
+      <div class="d-head-group">
+        <button class="icon-btn" id="d-fav" data-i18n-title="favAdd" data-i18n-aria="favAdd">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M8.5 2.4l1.9 3.8 4.2.6-3 3 .7 4.2-3.8-2-3.8 2 .7-4.2-3-3 4.2-.6z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+        </button>
+        <button class="icon-btn" id="d-pause" data-i18n-title="pauseTitle" data-i18n-aria="pause">
+          <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M5 3v9M10 3v9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </button>
+        <button class="icon-btn" id="d-refresh" data-i18n-title="refreshOne" data-i18n-aria="refreshOne">
+          <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14 8.5a5.5 5.5 0 1 1-1.6-3.9M14 2.5v3h-3" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <button class="icon-btn" id="d-close" data-i18n-title="close" data-i18n-aria="close">
+        <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M3 3l9 9M12 3l-9 9" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <a id="d-title" target="_blank" rel="noopener"></a>
+    <div id="d-store" class="muted"></div>
+    <div class="d-price-row">
+      <span id="d-price"></span>
+      <span id="d-change" class="badge" hidden></span>
+    </div>
+    <div id="chart-wrap">
+      <canvas id="d-chart"></canvas>
+      <div id="chart-tip" hidden></div>
+    </div>
+    <div id="d-note" class="muted"></div>
+    <div id="d-error" class="err-note" hidden></div>
+    <div class="d-grid">
+      <label><span data-i18n="desiredPrice"></span>
+        <input id="d-target" type="text" inputmode="decimal" data-i18n-placeholder="desiredPricePh">
+      </label>
+      <label><span data-i18n="folder"></span>
+        <select id="d-folder"></select>
+      </label>
+    </div>
+    <div class="d-grid">
+      <label><span data-i18n="emoji"></span>
+        <input id="d-emoji" type="text" maxlength="4" placeholder="🎧">
+      </label>
+      <label><span data-i18n="customName"></span>
+        <input id="d-name" type="text" maxlength="120" data-i18n-placeholder="customNamePh">
+      </label>
+    </div>
+    <label class="d-note-label"><span data-i18n="note"></span>
+      <textarea id="d-note-text" rows="2" maxlength="500" data-i18n-placeholder="notePh"></textarea>
+    </label>
+    <div class="d-stats" id="d-stats"></div>
+    <div class="d-actions">
+      <button id="d-save" class="primary" data-i18n="save"></button>
+      <button id="d-delete" class="danger" data-i18n="delete"></button>
+    </div>
+  </aside>
+
+</div>
+<script src="../lib/i18n.js"></script>
+<script src="page.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+	"manifest_version": 3,
+	"name": "__MSG_extensionName__",
+	"version": "0.9.6",
+	"default_locale": "en",
+	"description": "__MSG_extensionDescription__",
+	"minimum_chrome_version": "116",
+	"icons": {
+		"16": "icons/icon16.png",
+		"32": "icons/icon32.png",
+		"48": "icons/icon48.png",
+		"128": "icons/icon128.png"
+	},
+	"permissions": ["storage", "alarms", "notifications"],
+	"host_permissions": ["<all_urls>"],
+	"background": {
+		"service_worker": "sw.js"
+	},
+	"action": {
+		"default_title": "__MSG_actionTitle__",
+		"default_popup": "popup/popup.html",
+		"default_icon": {
+			"16": "icons/icon16.png",
+			"32": "icons/icon32.png"
+		}
+	},
+	"content_scripts": [
+		{
+			"matches": ["*://*.wildberries.ru/*"],
+			"js": ["lib/browser-polyfill.min.js", "lib/i18n.js", "content/widget-dom.js", "content/wb.js"],
+			"css": ["content/wb.css"],
+			"run_at": "document_idle"
+		},
+		{
+			"matches": ["*://*.ozon.ru/*"],
+			"js": ["lib/browser-polyfill.min.js", "lib/i18n.js", "content/widget-dom.js", "content/ozon.js"],
+			"css": ["content/wb.css"],
+			"run_at": "document_idle"
+		},
+		{
+			"matches": ["<all_urls>"],
+			"exclude_matches": ["*://*.wildberries.ru/*", "*://*.ozon.ru/*"],
+			"js": ["lib/browser-polyfill.min.js", "lib/i18n.js", "content/widget-dom.js", "content/generic.js"],
+			"css": ["content/wb.css"],
+			"run_at": "document_idle"
+		}
+	]
+}

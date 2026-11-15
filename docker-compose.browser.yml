@@ -1,0 +1,35 @@
+# Opt-in browser route for the existing marketplace connectors.
+# Use with docker compose -f docker-compose.yml -f docker-compose.browser.yml.
+services:
+  chrome:
+    build:
+      context: .
+      dockerfile: deployment/chrome/Dockerfile
+    init: true
+    restart: unless-stopped
+    shm_size: 256m
+    mem_limit: 768m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes:
+      - chrome_profile:/home/browser/profile
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:9223/json/version"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+
+  api:
+    environment:
+      CHROME_CDP_HOST: chrome
+
+  bot:
+    environment:
+      CHROME_CDP_HOST: chrome
+
+  worker:
+    environment:
+      CHROME_CDP_HOST: chrome
+
+volumes:
+  chrome_profile:
