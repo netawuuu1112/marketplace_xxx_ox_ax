@@ -50,6 +50,19 @@ services:
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
     volumes: [v2_chrome:/home/browser/profile]
+  agent:
+    profiles: [agent]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: [python, -m, catalog_v2.source_agent]
+    environment:
+      CHROME_CDP_HOST: chrome
+      MARKETFUSION_SOURCE_AGENT_BIND: '0.0.0.0'
+      MARKETFUSION_SOURCE_AGENT_TOKEN: ${V2_AGENT_TOKEN:-}
+    mem_limit: 384m
+    ports: [127.0.0.1:8092:8092]
+    depends_on: [chrome]
 volumes:
   v2_postgres:
   v2_chrome:

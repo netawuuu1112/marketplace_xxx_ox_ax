@@ -648,6 +648,8 @@ async def _search_yandex(query: str, limit: int) -> list[MarketOffer]:
         offers.append(
             MarketOffer(
                 source="yandex_market",
+                region=getattr(response, 'region', ''),
+                region_id=getattr(response, 'region_id', ''),
                 product_id=item.product_id,
                 variant_id=getattr(item, "sku_id", "") or "",
                 title=item.title,

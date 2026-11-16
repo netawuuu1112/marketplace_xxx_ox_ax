@@ -39,7 +39,9 @@ class ConnectorSource:
             candidates=[]
             for raw in result.offers:
                 identity=raw.identity
-                variant=identify(raw.title,brand=identity.brand or raw.brand,model=identity.model,mpn=identity.mpn,gtin=identity.gtin,attributes=identity.variant_attributes)
+                native_condition=getattr(getattr(raw,'evidence',None),'condition','')
+                condition=native_condition if native_condition in ('new','used','refurbished') else 'unknown'
+                variant=identify(raw.title,brand=identity.brand or raw.brand,model=identity.model,mpn=identity.mpn,gtin=identity.gtin,attributes=identity.variant_attributes,condition=condition)
                 price=minor_units(raw.price_rub) if raw.price_rub is not None else None
                 if raw.price_kind and raw.price_kind not in ('regular',):
                     price=None
@@ -53,10 +55,14 @@ class ConnectorSource:
                 oid=hashlib.sha256(f'{raw.source}:{raw.product_id}:{raw.variant_id}'.encode()).hexdigest()[:32]
                 offer=MarketplaceOffer(id=oid,source=self.name,native_id=raw.product_id,title=raw.title,seller=raw.seller,
                     url=raw.url,price=price if price else None,conditional_prices=conditional,currency=currency,
-                    rating=raw.rating,in_stock=raw.in_stock,region='',condition=variant.condition)
+                    rating=raw.rating,in_stock=raw.in_stock,region=getattr(raw,'region',''),condition=variant.condition)
                 candidates.append((offer,variant))
             if status=='ok' and candidates and not any(o.price for o,_ in candidates): status='partial'
-            report=SourceStatus(source=self.name,status=status,detail=outcome.detail[:220]+'; регион источника не подтверждён',offers_count=len(candidates),elapsed_ms=int((time.monotonic()-started)*1000),region='')
+            regions={offer.region for offer,_ in candidates if offer.region}
+            actual_region=next(iter(regions)) if len(regions)==1 and all(offer.region for offer,_ in candidates) else ''
+            region_note='; регион цены: '+actual_region if actual_region else '; регион источника не подтверждён'
+            report=SourceStatus(source=self.name,status=status,detail=outcome.detail[:220]+region_note,offers_count=len(candidates),elapsed_ms=int((time.monotonic()-started)*1000),region=actual_region,
+                supports_monitoring=bool(actual_region and any(offer.price is not None for offer,_ in candidates)))
             batch=SourceBatch(report,candidates)
             if status in ('ok','partial'):
                 self.failures=0
@@ -77,4 +83,16 @@ class ConnectorSource:
 def default_adapters():
     from compare_connector.server import SOURCES
     supported=('wildberries','yandex_market','ozon','megamarket','avito','dns','citilink','lamoda','aliexpress','taobao')
-    return {name:ConnectorSource(name) for name in supported if name in SOURCES}
+    adapters={name:ConnectorSource(name) for name in supported if name in SOURCES}
+    import os
+    url=os.getenv('MARKETFUSION_SOURCE_AGENT_URL','')
+    socket_path=os.getenv('MARKETFUSION_SOURCE_AGENT_SOCKET','')
+    token=os.getenv('MARKETFUSION_SOURCE_AGENT_TOKEN','')
+    names=[name.strip() for name in os.getenv('MARKETFUSION_SOURCE_AGENT_SOURCES','').split(',') if name.strip()]
+    if names:
+        if (not url and not socket_path) or not token or set(names)-adapters.keys():
+            raise ValueError('Invalid private source agent configuration')
+        from .remote_source import RemoteSource
+        for name in names:
+            adapters[name]=RemoteSource(name,url or 'http://source-agent',token,socket_path=socket_path or None)
+    return adapters

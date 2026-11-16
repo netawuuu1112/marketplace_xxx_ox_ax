@@ -494,6 +494,8 @@ async def yandex_search(
         duplicates_dropped=duplicates_dropped,
     )
     return YandexSearchResponse(
+        region=parsed.get('region', ''),
+        region_id=parsed.get('region_id', ''),
         query=parsed.get("query") or text,
         page=parsed.get("page") or page,
         page_count=parsed.get("page_count"),

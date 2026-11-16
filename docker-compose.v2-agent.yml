@@ -1,0 +1,9 @@
+# Local acceptance only: selected data flows through the private desktop agent.
+# Use with docker-compose.v2-staging.yml and --profile agent --profile browser.
+services:
+  api:
+    environment:
+      MARKETFUSION_SOURCE_AGENT_URL: http://agent:8092
+      MARKETFUSION_SOURCE_AGENT_TOKEN: ${V2_AGENT_TOKEN:?run the staging startup script first}
+      MARKETFUSION_SOURCE_AGENT_SOURCES: avito,dns,aliexpress
+    depends_on: [agent]

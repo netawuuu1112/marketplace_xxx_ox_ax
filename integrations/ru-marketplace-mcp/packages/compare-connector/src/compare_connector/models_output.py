@@ -35,6 +35,8 @@ class MarketOffer(BaseModel):
     title: str = Field(default="", description="Product title as the marketplace names it.")
     brand: str = Field(default="", description="Brand name, when reported.")
     seller: str = Field(default="", description="Seller/shop name, when reported.")
+    region: str = Field(default='', description="Actual source price region; empty when unconfirmed.")
+    region_id: str = Field(default='', description="Source-specific region identifier from the same response.")
     price_rub: float | None = Field(
         default=None,
         description=(

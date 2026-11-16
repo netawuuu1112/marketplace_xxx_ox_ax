@@ -188,3 +188,47 @@ def test_outbox_parallel_claims_send_once_and_persist_receipt(monkeypatch):
         finally:
             await cleanup(db, schema)
     asyncio.run(run())
+
+
+def test_offer_watch_requires_selected_offers_region_not_another_offer(monkeypatch):
+    async def run():
+        db,schema=await isolated()
+        try:
+            target=group()
+            other=target.offers[0].model_copy(update={'id':'other-region','native_id':'other','region':'Омск'})
+            target.offers.append(other)
+            service(monkeypatch,target,[target])
+            with pytest.raises(ValueError):
+                await watches.create_watch(db,1,watches.WatchCreate(product_id=target.product.id,
+                    mode='offer',offer_id=other.id,region='Москва'))
+            assert await db.pool.fetchval('SELECT count(*) FROM v2_watches')==0
+        finally: await cleanup(db,schema)
+    asyncio.run(run())
+
+
+def test_minimum_watch_requires_region_evidence_from_selected_sources(monkeypatch):
+    async def run():
+        db,schema=await isolated()
+        try:
+            target=group(source='yandex_market')
+            target.offers.append(target.offers[0].model_copy(update={'id':'wb-unknown','source':'wb','region':''}))
+            service(monkeypatch,target,[target])
+            with pytest.raises(ValueError):
+                await watches.create_watch(db,1,watches.WatchCreate(product_id=target.product.id,
+                    sources=['wb'],region='Москва'))
+        finally: await cleanup(db,schema)
+    asyncio.run(run())
+
+
+def test_targeted_one_shot_claim_leaves_other_due_watches_untouched(monkeypatch):
+    async def run():
+        db,schema=await isolated()
+        try:
+            service(monkeypatch,group(),[group()])
+            first=await watches.create_watch(db,1,watches.WatchCreate(product_id='p1tb',region='Москва'))
+            second=await watches.create_watch(db,1,watches.WatchCreate(product_id='p1tb',region='Москва'))
+            claimed=await watches.claim_due_watch(db,watch_id=second['id'])
+            assert claimed['id']==second['id']
+            assert (await watches.claim_due_watch(db))['id']==first['id']
+        finally: await cleanup(db,schema)
+    asyncio.run(run())

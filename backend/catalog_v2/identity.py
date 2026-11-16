@@ -36,6 +36,10 @@ def identify(title: str, *, brand: str = '', model: str = '', mpn: str = '', gti
     if not model:
         model = next((m.group(0) for p in patterns if (m := re.search(p,text))), '')
     model = normalize_query(model).removeprefix('galaxy ')
+    if not mpn:
+        part=re.search(r'\bsnv[2-9](?:sm3|s)[/\s-]+[0-9]+[a-z0-9]*\b',text)
+        if part:
+            mpn=part[0]
     attrs = {str(k): normalize_query(str(v)) for k,v in (attributes or {}).items()}
     sizes = sorted({int(m.group(1)) * (1000 if m.group(2)=='tb' else 1) for m in re.finditer(r'(?<!\w)(\d+)\s*(tb|gb)\b',text)})
     if not sizes and re.search(r'iphone|galaxy|redmi|s\d{2}', model):
@@ -58,7 +62,13 @@ def identify(title: str, *, brand: str = '', model: str = '', mpn: str = '', gti
     if re.search(r'\bssd\b|\bnv\d\b',text):
         if factor := re.search(r'\b(2230|2242|2260|2280|22110)\b',text):
             attrs.setdefault('form_factor',factor[1])
-    if re.search(r'\b(?:бу|б/у|used|восстановлен\w*|refurbished)\b',text): condition='used'
+    condition_text=re.sub(r'\b(?:не|not)\s+(?:как\s+)?(?:нов\w*|new|бу|б/у|used|восстановлен\w*|refurbished)\b','',text)
+    if re.search(r'\b(?:восстановлен\w*|refurbished)\b',condition_text):
+        condition='refurbished'
+    elif re.search(r'\b(?:бу|б/у|used|как нов(?:ый|ая|ое|ые))\b',condition_text):
+        condition='used'
+    elif condition=='unknown' and re.search(r'\b(?:новый|новая|новое|новые|new|sealed)\b',condition_text):
+        condition='new'
     category = 'storage' if re.search(r'\bssd\b|\bnv\d\b',text) else 'phone' if re.search(r'iphone|galaxy|redmi|s\d{2}',model) else 'audio' if '1000xm' in model else 'other'
     barcode=normalize_gtin(gtin) or (normalize_gtin(text) if text.isdigit() else '')
     return ProductVariant(title=title, brand=brand, model=model, category=category, mpn=re.sub(r'[^a-z0-9]','',mpn.casefold()), gtin=barcode, attributes=attrs, condition=condition)

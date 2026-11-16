@@ -1,5 +1,6 @@
 """Shared bounded search jobs with incremental results and conservative grouping."""
 import asyncio
+import hashlib
 from contextlib import asynccontextmanager
 from datetime import datetime,timezone
 from .identity import identify, identity_key, match_variant, normalize_query
@@ -160,6 +161,10 @@ class SearchService:
             variant=variant.model_copy(deep=True)
             decision=match_variant(target,variant)
             key=identity_key(variant,f'{offer.source}:{offer.native_id}')
+            if offer.source=='avito' and variant.condition=='unknown':
+                key=hashlib.sha256(f'avito:unconfirmed-condition:{offer.native_id}'.encode()).hexdigest()[:32]
+                if decision.status=='exact':
+                    decision=decision.model_copy(update={'status':'probable','reasons':['Состояние объявления не подтверждено']})
             variant.id=key; variant.product_id=key
             # Offer identity is relative to its own group; query relevance lives
             # on ProductGroup. Explicit selection can track a related card safely.

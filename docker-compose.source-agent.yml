@@ -1,0 +1,17 @@
+# FUTURE VPS configuration; do not apply without the owner's production approval.
+# SSH reverse streamlocal listener lives in a dedicated root-only host directory.
+# Forwarding the socket avoids a public TCP listener and GatewayPorts changes.
+services:
+  api:
+    environment: &agent_environment
+      MARKETFUSION_SOURCE_AGENT_SOCKET: /run/marketfusion-agent/source.sock
+      MARKETFUSION_SOURCE_AGENT_TOKEN: ${MARKETFUSION_SOURCE_AGENT_TOKEN:?set the private agent token}
+      MARKETFUSION_SOURCE_AGENT_SOURCES: avito,dns,aliexpress
+    volumes: &agent_volumes
+      - /run/marketfusion-agent:/run/marketfusion-agent:ro
+  bot:
+    environment: *agent_environment
+    volumes: *agent_volumes
+  worker:
+    environment: *agent_environment
+    volumes: *agent_volumes

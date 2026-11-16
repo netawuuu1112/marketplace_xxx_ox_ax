@@ -89,7 +89,7 @@ class MarketplaceOffer(BaseModel):
 
     def total(self, region: str) -> int | None:
         d = self.delivery
-        if self.price is None or self.currency != 'RUB' or d.price is None or not region or d.region != region or d.confidence != 'confirmed':
+        if self.price is None or self.currency != 'RUB' or d.price is None or not region or d.region != region or d.confidence != 'confirmed' or (self.region and self.region != region):
             return None
         return self.price + d.price
 
@@ -120,7 +120,7 @@ class ProductGroup(BaseModel):
 
 
 def compare_group(variant: ProductVariant, offers: list[MarketplaceOffer], *, region: str = '', product: CatalogProduct | None = None) -> ProductGroup:
-    eligible = [o for o in offers if o.match_status == 'exact' and o.price is not None and o.currency == 'RUB' and o.in_stock is not False]
+    eligible = [o for o in offers if o.match_status == 'exact' and o.price is not None and o.currency == 'RUB' and o.in_stock is not False and (not region or not o.region or o.region == region)]
     cheapest = min(eligible, key=lambda o: o.price, default=None)
     delivered = [o for o in eligible if o.total(region) is not None]
     best_total = min(delivered, key=lambda o: o.total(region), default=None)

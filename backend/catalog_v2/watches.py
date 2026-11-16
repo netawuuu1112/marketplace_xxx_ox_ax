@@ -162,13 +162,15 @@ def _watch_json(row):
 async def create_watch(db, user_id: int, payload: WatchCreate) -> dict:
     from .identity import match_variant
     target = await _service(db).get_product(user_id, payload.product_id)
-    if not any(offer.region==payload.region for offer in target.offers):
+    if not any(offer.region==payload.region and (not payload.sources or offer.source in payload.sources) for offer in target.offers):
         raise ValueError('Источники не подтвердили регион цены. Наблюдение для выбранного региона пока недоступно.')
     if not target.variant.id or not target.variant.product_id or match_variant(target.variant, target.variant).status != "exact":
         raise ValueError("Не подтверждены модель и характеристики товара")
     offer = next((o for o in target.offers if o.id == payload.offer_id), None)
     if payload.mode == "offer" and (offer is None or offer.match_status != "exact" or not offer.native_id):
         raise ValueError("Выберите подтверждённое предложение этого товара")
+    if offer and offer.region != payload.region:
+        raise ValueError("Выбранное предложение не подтверждает цену для указанного региона")
     if offer and payload.sources and offer.source not in payload.sources:
         raise ValueError("Выбранная площадка не входит в источники наблюдения")
     if offer and offer.currency != "RUB":
@@ -266,13 +268,14 @@ async def history(db, user_id: int, product_id: str, days="30") -> dict:
             "average": float(aggregate["average"]) if aggregate["average"] is not None else None}, "region": region, "currency": "RUB"}
 
 
-async def claim_due_watch(db):
+async def claim_due_watch(db, *, watch_id: int | None = None):
     async with db.pool.acquire() as conn:
         async with conn.transaction():
             return await conn.fetchrow("""UPDATE v2_watches SET lease_token=$1,lease_until=now()+interval '15 minutes'
                 WHERE id=(SELECT id FROM v2_watches WHERE active AND state='active' AND next_run_at<=now()
+                AND ($2::bigint IS NULL OR id=$2)
                 AND (lease_until IS NULL OR lease_until<=now()) ORDER BY next_run_at,id
-                FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *""", uuid4().hex)
+                FOR UPDATE SKIP LOCKED LIMIT 1) RETURNING *""", uuid4().hex, watch_id)
 
 
 def _select_offers(row, target, snapshot):

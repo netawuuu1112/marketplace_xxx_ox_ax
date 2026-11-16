@@ -71,7 +71,13 @@ jobs:
           V2_WEB_PASSWORD: ci-placeholder
           V2_SESSION_SECRET: ci-placeholder
           V2_ENCRYPTION_KEY: ci-placeholder
-        run: docker compose -f docker-compose.v2-staging.yml config --quiet
+          V2_AGENT_TOKEN: ci-private-agent-placeholder
+          MARKETFUSION_SOURCE_AGENT_TOKEN: ci-private-agent-placeholder
+        run: |
+          docker compose -f docker-compose.v2-staging.yml -f docker-compose.v2-agent.yml config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.source-agent.yml config --quiet
+          docker compose -f docker-compose.v2-staging.yml --profile agent --profile browser config --format json > compose-agent.json
+          python -c "import json; c=json.load(open('compose-agent.json')); a=c['services']['agent']; assert all(p['host_ip']=='127.0.0.1' for p in a['ports']); assert 'DATABASE_URL' not in a['environment']; assert 'SHOPPER_BOT_TOKEN' not in a['environment']"
       - run: |
           docker compose -f docker-compose.yml -f docker-compose.browser.yml config --format json > compose-browser.json
           python -c "import json; c=json.load(open('compose-browser.json')); assert 'ports' not in c['services']['chrome']; assert c['services']['api']['environment']['CHROME_CDP_HOST']=='chrome'"

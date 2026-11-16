@@ -16,6 +16,9 @@ if (-not (Test-Path -LiteralPath $stagingEnv)) {
 if (-not (Select-String -LiteralPath $stagingEnv -Pattern '^V2_ENCRYPTION_KEY=' -Quiet)) {
     Add-Content -Encoding ascii -LiteralPath $stagingEnv -Value ('V2_ENCRYPTION_KEY='+(New-LocalSecret 32))
 }
+if (-not (Select-String -LiteralPath $stagingEnv -Pattern '^V2_AGENT_TOKEN=' -Quiet)) {
+    Add-Content -Encoding ascii -LiteralPath $stagingEnv -Value ('V2_AGENT_TOKEN='+(New-LocalSecret 32))
+}
 docker compose --env-file .env.v2-staging -f docker-compose.v2-staging.yml up -d --build
 if ($LASTEXITCODE -ne 0) { throw 'Staging did not start' }
 Write-Output 'Staging: http://127.0.0.1:8089 ; local login is stored in ignored .env.v2-staging'

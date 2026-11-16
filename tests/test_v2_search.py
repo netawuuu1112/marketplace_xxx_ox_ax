@@ -88,3 +88,14 @@ def test_marketplace_link_lookup_respects_existing_source_gate(monkeypatch):
         service.gate.release()
         await service.close()
     asyncio.run(scenario())
+
+
+def test_unknown_condition_classified_ad_does_not_lower_retail_minimum():
+    async def scenario():
+        service=SearchService(SimpleNamespace(),adapters={'yandex_market':Adapter('yandex_market',500000),'avito':Adapter('avito',300000)})
+        result=await service.search(1,SearchRequest(query='Kingston NV3 1TB'))
+        assert result.groups[0].minimum_price==500000
+        assert all(offer.source!='avito' for group in result.groups for offer in group.offers)
+        assert any(offer.source=='avito' for group in result.related for offer in group.offers)
+        await service.close()
+    asyncio.run(scenario())
