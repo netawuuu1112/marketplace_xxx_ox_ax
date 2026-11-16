@@ -31,3 +31,12 @@ Initial private browser connection failed because of container sandbox restricti
 ## 2026-11-14 — Marketplace source limits
 
 Ozon returns HTTP 403 through browser; Avito reports IP firewall; WB DOM search returns cards but only conditional Wallet prices, which compare excludes. Other source outcomes are in `docs/MVP_SOURCE_STATUS_RU.md`. These are open external or parser issues, not fixed by browser startup alone.
+
+
+## 2026-11-16 — Real local integration regressions
+
+SameOrigin PATCH through localNginx8089 returned403: proxy Host $host droppedport. Use $http_host; actual authenticatedOriginPATCH nowpasses. KingstonMPN inlineforms were lost; normalize SNV3S/1000G versusSNV3SM3/1T0 separately. Negatedconditiontext andunknown-conditionAvito couldlowerretailgroups; regression-coveredcondition handling andprobable isolation. Foreign-citycheapoffer wronglyloweredcitysummary; backend/UI exclude confirmed mismatch, testedbrowseranddomain.
+
+YM/WBreviewUI returned[] because Orchestrator used absentWB/no-opYMlegacyadapters. Maintainedconnectors now used withsourcegates; failuresuncached503. InitialstrictYMproductID check rejectedrealSKU->modelfamilyresolution; validate trustedrequestedcardroute andlabelgrouponly. Reviewprompt omittedpros/cons andscope, cachedanalysis ignoredscope, botdeletedonlyscopewarning: nowcontent/scopeversionedprompt/cache, conservative no_dataverdicts andpersistentwarning. Nonemptybutunusablereviewpools also reportunavailable. Tenfocusedregressions passed afterobservedred/greenfixes.
+
+Docker testPGpublishedport changes on restart; discover docker port instead ofhardcoding. Browser V2_UI_URL must pointatlisteningservice(8089used), not stale5175 default. One Windowscurl_cffi selectorwarning useslibraryfallbackthread; tests pass. UTF8PowerShell pipe requires OutputEncoding UTF8 forCyrillicpatches; binarySQLoutput goesdirectfile, notPSredirect.

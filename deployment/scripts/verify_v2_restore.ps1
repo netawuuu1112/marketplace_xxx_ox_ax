@@ -18,12 +18,14 @@ if ($LASTEXITCODE -ne 0) { throw 'Creating isolated restore database failed' }
 try {
     docker exec $container pg_restore -U marketfusion --exit-on-error --no-owner -d $restoreDb /tmp/marketfusion-v2-check.dump
     if ($LASTEXITCODE -ne 0) { throw 'pg_restore failed' }
-    $query = "SELECT (SELECT count(*) FROM users),(SELECT count(*) FROM favorites),(SELECT count(*) FROM v2_watches),(SELECT count(*) FROM schema_migrations)"
+    $tablesToVerify = @('users','favorites','mf_products','mf_variants','mf_offers','mf_favorites','mf_price_observations','v2_watches','v2_observations','schema_migrations')
+    $query = ($tablesToVerify | ForEach-Object { "SELECT '{0}:'||count(*)||':'||md5(COALESCE(jsonb_agg(to_jsonb(r) ORDER BY to_jsonb(r)::text)::text,'[]')) FROM {0} r" -f $_ }) -join ' UNION ALL '
     $original = docker exec $container psql -U marketfusion -d marketfusion_v2 -At -c $query
     $restored = docker exec $container psql -U marketfusion -d $restoreDb -At -c $query
-    if ($original -ne $restored) { throw 'Restored counts do not match' }
+    if (($original -join "`n") -cne ($restored -join "`n")) { throw 'Restored table contents do not match' }
     Copy-Item -LiteralPath .env.v2-staging -Destination (Join-Path $backupDir 'staging.env.restore-tested')
-    Write-Output "Restore verified: $original ; dump stored under ignored backups/v2"
+    $counts = ($original | ForEach-Object { ($_.Split(':')[0..1]) -join ':' }) -join ', '
+    Write-Output "Restore verified: $counts ; table fingerprints match; dump stored under ignored backups/v2"
 } finally {
     # This name is generated above; project identity was checked before creation.
     docker exec $container dropdb -U marketfusion $restoreDb | Out-Null

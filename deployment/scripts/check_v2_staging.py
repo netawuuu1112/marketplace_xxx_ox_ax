@@ -18,6 +18,9 @@ def main():
         page.get_by_role('button', name='Войти', exact=True).click()
         nav = page.get_by_role('navigation', name='Главная навигация')
         expect(nav).to_be_visible()
+        profile=context.request.get(base+'/api/v2/profile').json()
+        saved=context.request.patch(base+'/api/v2/profile',data=profile,headers={'Origin':base})
+        assert saved.ok, 'Same-origin mutation must work through the actual reverse proxy'
         for tab, heading in [('Избранное', 'Избранное'), ('Мониторинг', 'Мониторинг цен'), ('Профиль', 'Профиль')]:
             nav.get_by_role('button', name=tab, exact=True).click()
             expect(page.get_by_role('heading', name=heading, exact=True)).to_be_visible()
@@ -33,7 +36,9 @@ def main():
         assert health.ok and health.json().get('demo') is False
         assert not errors, errors
         (root / 'docs/qa').mkdir(exist_ok=True)
-        page.screenshot(path=str(root / 'docs/qa/v2-staging-home-empty.png'), full_page=True)
+        recent=context.request.get(base+'/api/v2/recent').json()
+        name='v2-staging-home-live.png' if recent.get('products') else 'v2-staging-home-empty.png'
+        page.screenshot(path=str(root / 'docs/qa' / name), full_page=True)
         browser.close()
     print('Local staging verified: login, HttpOnly session, four tabs, protected admin usage, health, no page errors or horizontal overflow. No source search executed.')
 

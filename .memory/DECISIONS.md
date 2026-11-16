@@ -23,3 +23,12 @@ Keep WB Wallet and other conditional prices out of ordinary-price ranking. Surfa
 ## 2026-11-14 — External access
 
 Use no new paid provider and send no vendor inquiry, per user instruction. Preserve external source failures explicitly; do not mark full MVP complete until live paths work.
+
+
+## 2026-11-16 — Source provenance and private optional transport
+
+Use only semantic source globalDeliveryPoint for YM region, never requestedcity/IP/default. Known foreign-city prices cannot lower selected-city min; selectedwatchoffer must confirm its ownregion. MPN and condition remain separate identity facts. Optional authenticated private agent can use an available desktopnetwork, with boundedread-onlysourcecalls and UnixSSHroute; do not exposeCDP/publicproxy. Deviceuptime is an explicit limitation; persistentproductionroute remains uninstalled pending§14releasepermission.
+
+## 2026-11-16 — Reviews belong to a card family
+
+Maintained YM/WB connectors replace missing/no-op legacyreadpaths while retaining demo/legacyOzon. YMmodelID differsfromrequestedSKU; trustedrequestcardroute identifies the requestedcollection, not independent selectedvariantproof. Mark sharedcard scope, passscope pluspros/cons toanalysis, versioncontent/scope cache and force pooledrequirements no_data. Countedbutinaccessible/unratedpool is unavailable, never zero reviews. Keep finalTelegramwarning. No paidgeneration needed for routing/unit/source-read verification.
