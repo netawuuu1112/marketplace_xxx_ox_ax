@@ -23,6 +23,7 @@ export interface Review {
   pros?: string;
   cons?: string;
   bought_here?: boolean;
+  scope?: 'unknown' | 'variant_group';
 }
 
 export interface CompareRow {

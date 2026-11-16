@@ -22,12 +22,13 @@ import html as _html
 import io
 import logging
 import os
+from functools import wraps
 from typing import Awaitable, Callable
 
 from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
-from aiogram.types import MenuButtonWebApp, WebAppInfo
+from aiogram.types import BotCommand, MenuButtonWebApp, ReplyKeyboardRemove, WebAppInfo
 from aiogram import F
 from aiogram.filters import Command, CommandStart
 from aiohttp import web
@@ -36,7 +37,7 @@ from aiogram.types import (CallbackQuery, ErrorEvent, InlineKeyboardMarkup, Mess
 import config
 from adapters import build_adapters
 from core.orchestrator import Orchestrator, SearchOutcome
-from keyboards import (MENU, compare_keyboard, home_keyboard,
+from keyboards import (app_keyboard, catalog_product_keyboard, home_keyboard,
                        product_card_keyboard, product_ref, reviews_keyboard,
                        settings_keyboard)
 from llm.gateway import BudgetExceeded, LLMGateway
@@ -130,22 +131,15 @@ def _compare_text(rows) -> str:
 
 @router.message(CommandStart())
 async def cmd_start(message: Message) -> None:
-    await message.answer(
-        "Привет! Я <b>«Умный Шоппер»</b> — ИИ-ассистент покупок на "
-        "<b>Ozon</b>, <b>Яндекс Маркете</b> и <b>Wildberries</b>.\n\n"
-        "Могу:\n"
-        "• 📸 найти товар по фотографии;\n"
-        "• 🔎 найти по описанию: «чёрная маска для сна с пространством для "
-        "ресниц» — проверю требования по отзывам;\n"
-        "• ⚖️ сравнить цены на трёх площадках;\n"
-        "• 📝 показать отзывы и ответить на вопросы о товарах.\n\n"
-        "Просто напишите, что ищете, или выберите действие в меню.",
-        reply_markup=MENU,
+    # Telegram cannot send ReplyKeyboardRemove and inline markup together.
+    # Remove the old keyboard, then attach inline actions to this same message.
+    welcome = await message.answer(
+        "<b>MarketFusion AI 🛍</b>\n\n"
+        "Найду товар, сравню цены на маркетплейсах и помогу следить за ценой.\n\n"
+        "Отправьте название товара, ссылку или фотографию.",
+        reply_markup=ReplyKeyboardRemove(),
     )
-    await message.answer(
-        "🏠 <b>Главное меню</b> — выберите действие:",
-        reply_markup=home_keyboard(),
-    )
+    await welcome.edit_reply_markup(reply_markup=home_keyboard())
 
 
 @router.message(Command("search"))
@@ -195,6 +189,11 @@ async def cmd_settings(message: Message) -> None:
     await _show_settings(message)
 
 
+@router.message(Command("help"))
+async def cmd_help(message: Message) -> None:
+    await message.answer(_help_text(), reply_markup=app_keyboard())
+
+
 @router.message(Command("favorites"))
 async def cmd_favorites(message: Message) -> None:
     await _show_favorites(message, message.from_user.id)
@@ -222,42 +221,33 @@ async def cmd_compare(message: Message) -> None:
 
 @router.message(Command("watch"))
 async def cmd_watch(message: Message) -> None:
-    """/watch название товара | порог в рублях"""
-    if not hasattr(db, "pool"):
-        await message.answer("Мониторинг доступен при запуске с PostgreSQL.")
-        return
-    from monitoring import create_watch
+    """Resolve a product first; region and alert rules require explicit selection."""
     raw = (message.text or "").partition(" ")[2].strip()
-    query, sep, price = raw.partition("|")
-    try:
-        threshold = float(price.strip()) if sep and price.strip() else None
-        watch = await create_watch(db, message.from_user.id, query, threshold, 60, None)
-    except ValueError as exc:
-        await message.answer(_html.escape(str(exc)))
-        return
-    await message.answer(f"Добавлено наблюдение #{watch['id']}: {_html.escape(watch['query'])}")
+    query = raw.partition("|")[0].strip()
+    if query:
+        await _run_search(message, query)
+    else:
+        await message.answer("Найдите конкретный товар и нажмите «Следить за ценой». Регион и условия можно выбрать в приложении.",
+                             reply_markup=app_keyboard(view="watches"))
 
 
 @router.message(Command("watches"))
 async def cmd_watches(message: Message) -> None:
-    if not hasattr(db, "pool"):
-        await message.answer("Мониторинг доступен при запуске с PostgreSQL.")
-        return
-    from monitoring import list_watches
+    from catalog_v2.watches import list_watches
     rows = await list_watches(db, message.from_user.id)
     if not rows:
-        await message.answer("Наблюдений пока нет. Пример: /watch SSD 1 ТБ | 5000")
+        await message.answer("Наблюдений пока нет. Найдите товар и нажмите «Следить за ценой».", reply_markup=app_keyboard(view="watches"))
         return
-    lines = [f"#{r['id']} {_html.escape(r['query'])} — {_rub(r['last_price_rub'])}"
+    lines = [f"#{r['id']} {_html.escape(r['title'])} — {_money_minor(r['last_price'])} · {_html.escape(r['state'])}"
              for r in rows[:20]]
-    await message.answer("\n".join(lines))
+    await message.answer("\n".join(lines), reply_markup=app_keyboard(view="watches"))
 
 
 @router.message(Command("unwatch"))
 async def cmd_unwatch(message: Message) -> None:
-    from monitoring import delete_watch
+    from catalog_v2.watches import delete_watch
     raw = (message.text or "").partition(" ")[2].strip()
-    if not raw.isdigit() or not hasattr(db, "pool"):
+    if not raw.isdigit():
         await message.answer("Пример: /unwatch 12")
         return
     deleted = await delete_watch(db, message.from_user.id, int(raw))
@@ -266,24 +256,25 @@ async def cmd_unwatch(message: Message) -> None:
 
 @router.message(Command("history"))
 async def cmd_history(message: Message) -> None:
-    from monitoring import price_history
+    from catalog_v2.watches import history
     raw = (message.text or "").partition(" ")[2].strip()
-    if not raw.isdigit() or not hasattr(db, "pool"):
-        await message.answer("Пример: /history 12")
+    if not raw:
+        await message.answer("Откройте карточку товара в приложении и выберите историю цен.", reply_markup=app_keyboard())
         return
-    rows = await price_history(db, message.from_user.id, int(raw))
-    lines = [f"{r['captured_at'][:16]} · {r['source']} · {_rub(r['price_rub'])}"
-             for r in rows[:20]]
-    await message.answer("\n".join(lines) if lines else "Замеров пока нет.")
+    try:
+        result = await history(db, message.from_user.id, raw)
+    except LookupError:
+        await message.answer("Товар не найден. Выполните поиск ещё раз.")
+        return
+    lines = [f"{r['captured_at'][:16]} · {_html.escape(r['source'])} · {_money_minor(r['price'])}"
+             for r in result['points'][:20]]
+    await message.answer("\n".join(lines) if lines else "Замеров пока нет.", reply_markup=app_keyboard(product=raw, view="history"))
 
 
 @router.message(Command("notifications"))
 async def cmd_notifications(message: Message) -> None:
-    if not hasattr(db, "pool"):
-        await message.answer("Уведомления доступны при запуске с PostgreSQL.")
-        return
-    from monitoring import list_notifications
-    rows = await list_notifications(db, message.from_user.id)
+    from catalog_v2.watches import notifications
+    rows = await notifications(db, message.from_user.id)
     lines = [f"{_html.escape(r['title'])}: {_html.escape(r['body'])}" for r in rows[:10]]
     await message.answer("\n\n".join(lines) if lines else "Уведомлений пока нет.")
 
@@ -350,7 +341,7 @@ async def cmd_admin_audit(message: Message) -> None:
     await message.answer("\n".join(lines) if lines else "Журнал пуст.")
 
 
-@router.message()
+@router.message(F.text)
 async def on_text(message: Message) -> None:
     user_id = message.from_user.id
     text = (message.text or "").strip()
@@ -444,7 +435,46 @@ async def on_photo(message: Message) -> None:
 
 # ────────────────────────────── inline-колбэки ────────────────────
 
-@router.callback_query(lambda c: c.data.startswith("menu:"))
+def _secure_callback(handler):
+    """Callbacks act only in their owner's private chat; stale data is inert."""
+    @wraps(handler)
+    async def guarded(call: CallbackQuery):
+        msg = call.message
+        if (msg is None or call.from_user is None or
+                getattr(msg.chat, "type", None) != "private" or
+                msg.chat.id != call.from_user.id):
+            await call.answer("Откройте свой личный чат с ботом.", show_alert=True)
+            return
+        try:
+            return await handler(call)
+        except (ValueError, IndexError, LookupError):
+            await call.answer("Кнопка устарела. Выполните поиск ещё раз.", show_alert=True)
+    return guarded
+
+
+@router.callback_query(F.data.startswith("v2product:"))
+@_secure_callback
+async def cb_v2_product(call: CallbackQuery) -> None:
+    product_id = call.data.split(":", 1)[1]
+    group = await _catalog_service().get_product(call.from_user.id, product_id)
+    await call.answer()
+    await _edit_or_answer(call, _catalog_card_text(group, details=True),
+                          reply_markup=catalog_product_keyboard(group, details=True))
+
+
+@router.callback_query(F.data.startswith("v2watch:"))
+@_secure_callback
+async def cb_v2_watch(call: CallbackQuery) -> None:
+    product_id = call.data.split(":", 1)[1]
+    group = await _catalog_service().get_product(call.from_user.id, product_id)
+    await call.answer()
+    await _edit_or_answer(call, f"<b>{_html.escape(group.product.title[:250])}</b>\n"
+                          "Выберите предложение, регион и условия наблюдения в приложении.",
+                          reply_markup=app_keyboard("🔔 Настроить наблюдение", product=product_id, view="watch"))
+
+
+@router.callback_query(lambda c: (c.data or "").startswith("menu:"))
+@_secure_callback
 async def cb_menu(call: CallbackQuery) -> None:
     """Главное inline-меню: навигация по всем экранам бота."""
     action = call.data.split(":", 1)[1]
@@ -490,7 +520,8 @@ async def cb_menu(call: CallbackQuery) -> None:
     await call.answer("Неизвестное действие", show_alert=True)
 
 
-@router.callback_query(lambda c: c.data.startswith("reviews:"))
+@router.callback_query(lambda c: (c.data or "").startswith("reviews:"))
+@_secure_callback
 async def cb_reviews(call: CallbackQuery) -> None:
     _, market, ext_id = call.data.split(":")
     product = await _find_product(call.from_user.id, market, ext_id)
@@ -501,21 +532,29 @@ async def cb_reviews(call: CallbackQuery) -> None:
     requirements = (state.constraints.must_have
                     if state.constraints else [])
     progress = await call.message.answer(f"📖 Читаю отзывы на «{product.title[:40]}…»")
-    reviews = await orch._load_reviews(product)
+    from review.connectors import ReviewsUnavailable
+    try:
+        reviews = await orch._load_reviews(product, strict=True)
+    except ReviewsUnavailable:
+        await progress.edit_text('Источник отзывов временно недоступен. Попробуйте позже или откройте товар на площадке.')
+        return
     if not reviews:
         await progress.edit_text("Отзывов пока нет.")
         return
+    if any(r.scope == 'variant_group' for r in reviews):
+        await progress.edit_text('Отзывы общей карточки могут описывать другие варианты. Анализирую доступные тексты…')
     analysis = await _analyze(product, reviews, requirements)
     await progress.delete()
     await _send_analysis(call, product, analysis, reviews)
 
 
-@router.callback_query(lambda c: c.data.startswith("review_item:"))
+@router.callback_query(lambda c: (c.data or "").startswith("review_item:"))
+@_secure_callback
 async def cb_review_item(call: CallbackQuery) -> None:
     _, market, ext_id, idx = call.data.split(":")
     product = await _find_product(call.from_user.id, market, ext_id)
     if product is None:
-        return
+        raise LookupError("stale product")
     reviews = await orch._load_reviews(product)
     n = int(idx) - 1
     if n < 0 or n >= len(reviews):
@@ -537,27 +576,32 @@ async def cb_review_item(call: CallbackQuery) -> None:
     await _edit_review_message(call.message, text, kb)
 
 
-@router.callback_query(lambda c: c.data.startswith("review_more:"))
+@router.callback_query(lambda c: (c.data or "").startswith("review_more:"))
+@_secure_callback
 async def cb_review_more(call: CallbackQuery) -> None:
     _, market, ext_id, page = call.data.split(":")
     product = await _find_product(call.from_user.id, market, ext_id)
     if product is None:
-        return
+        raise LookupError("stale product")
+    if int(page) < 0:
+        raise ValueError("invalid page")
     reviews = await orch._load_reviews(product)
     kb = reviews_keyboard(market, ext_id, len(reviews), page=int(page))
     await call.message.edit_reply_markup(reply_markup=kb)
 
 
-@router.callback_query(lambda c: c.data.startswith("back:"))
+@router.callback_query(lambda c: (c.data or "").startswith("back:"))
+@_secure_callback
 async def cb_back(call: CallbackQuery) -> None:
     _, market, ext_id = call.data.split(":")
     product = await _find_product(call.from_user.id, market, ext_id)
     if product is None:
-        return
-    await _send_card(call.message, product)
+        raise LookupError("stale product")
+    await _send_card(call.message, product, user_id=call.from_user.id)
 
 
-@router.callback_query(lambda c: c.data.startswith("compare:"))
+@router.callback_query(lambda c: (c.data or "").startswith("compare:"))
+@_secure_callback
 async def cb_compare(call: CallbackQuery) -> None:
     _, market, ext_id = call.data.split(":")
     product = await _find_product(call.from_user.id, market, ext_id)
@@ -565,10 +609,11 @@ async def cb_compare(call: CallbackQuery) -> None:
         await call.answer("Товар не найден", show_alert=True)
         return
     await call.answer("⚖️ Сравниваю цены…")
-    await _run_compare(call.message, product.title)
+    await _run_compare(call.message, product.title, user_id=call.from_user.id)
 
 
-@router.callback_query(lambda c: c.data.startswith("fav:"))
+@router.callback_query(lambda c: (c.data or "").startswith("fav:"))
+@_secure_callback
 async def cb_fav(call: CallbackQuery) -> None:
     _, market, ext_id = call.data.split(":")
     product = await _find_product(call.from_user.id, market, ext_id)
@@ -583,10 +628,12 @@ async def cb_fav(call: CallbackQuery) -> None:
         await call.answer("Убрано из избранного")
 
 
-@router.callback_query(lambda c: c.data.startswith("more:"))
+@router.callback_query(lambda c: (c.data or "").startswith("more:"))
+@_secure_callback
 async def cb_more(call: CallbackQuery) -> None:
+    ref = call.data.split(":", 1)[1]
     state = await db.get_session(call.from_user.id)
-    if not state.constraints:
+    if not state.constraints or not any(product_ref(p) == ref or p.ext_id == ref for p in state.last_results):
         await call.answer("Сначала выполните поиск", show_alert=True)
         return
     await call.answer("🔁 Ищу ещё похожие…")
@@ -594,12 +641,15 @@ async def cb_more(call: CallbackQuery) -> None:
     outcome = await orch._execute_search(constraints, None)
     state.last_results = outcome.top
     await db.save_session(call.from_user.id, state)
-    await _send_outcome(call.message, outcome, "похожие варианты")
+    await _send_outcome(call.message, outcome, "похожие варианты", user_id=call.from_user.id)
 
 
-@router.callback_query(lambda c: c.data.startswith("set_profile:"))
+@router.callback_query(lambda c: (c.data or "").startswith("set_profile:"))
+@_secure_callback
 async def cb_set_profile(call: CallbackQuery) -> None:
     profile = call.data.split(":")[1]
+    if profile not in ("fast", "quality"):
+        raise ValueError("invalid profile")
     llm.set_profile(profile)
     await db.set_setting("profile", profile)
     await call.answer(f"Профиль моделей: {profile}")
@@ -607,13 +657,15 @@ async def cb_set_profile(call: CallbackQuery) -> None:
 
 
 @router.callback_query(lambda c: c.data == "set_clear")
+@_secure_callback
 async def cb_set_clear(call: CallbackQuery) -> None:
     await db.save_session(call.from_user.id, SessionState())
     await call.answer("Контекст очищен")
     await _show_settings_inline(call)
 
 
-@router.callback_query(lambda c: c.data.startswith("set_market:"))
+@router.callback_query(lambda c: (c.data or "").startswith("set_market:"))
+@_secure_callback
 async def cb_set_market(call: CallbackQuery) -> None:
     """Выбор площадок для поиска (both | ozon | yandex | wb)."""
     market = call.data.split(":", 1)[1]
@@ -629,71 +681,119 @@ async def cb_set_market(call: CallbackQuery) -> None:
 
 # ────────────────────────────── сценарии ──────────────────────────
 
-async def _run_search(message: Message, user_text: str) -> None:
-    user_id = message.from_user.id
+def _catalog_service():
+    from catalog_v2.service import get_service
+    return get_service(db)
+
+
+def _money_minor(amount: int | None, currency: str = "RUB") -> str:
+    if amount is None:
+        return "цена неизвестна"
+    major, minor = divmod(amount, 100)
+    value = f"{major:,}".replace(",", " ")
+    if minor:
+        value += f",{minor:02d}"
+    return f"{value} {'₽' if currency == 'RUB' else _html.escape(currency)}"
+
+
+def _catalog_card_text(group, *, details: bool = False) -> str:
+    lines = [f"<b>{_html.escape(group.product.title[:250])}</b>"]
+    best = next((o for o in group.offers if o.id == group.best_price_offer_id), None)
+    currency = best.currency if best else "RUB"
+    if group.match_status != "exact":
+        lines.append("Совпадение требует уточнения; цены не сравниваются.")
+    else:
+        lines.append(f"Минимальная обычная цена: <b>{_money_minor(group.minimum_price, currency)}</b>")
+    if best:
+        lines.append(f"Площадка: {_html.escape(best.source)}")
+    lines.append(f"Сопоставимых площадок: {group.sources_count}")
+    if best and best.delivery.confidence != "unknown":
+        delivery = best.delivery
+        dates = " — ".join(str(d)[:10] for d in (delivery.date_min, delivery.date_max) if d)
+        confidence = "подтверждена" if delivery.confidence == "confirmed" else "по данным площадки"
+        lines.append(f"Доставка: {_html.escape(dates) if dates else 'срок неизвестен'} ({confidence})")
+        lines.append("Стоимость доставки: " + (_money_minor(delivery.price, currency) if delivery.price is not None else "неизвестна"))
+    else:
+        lines.append("Срок и стоимость доставки неизвестны.")
+    if group.minimum_total is not None:
+        lines.append(f"Минимум с подтверждённой доставкой: {_money_minor(group.minimum_total, currency)}")
+    else:
+        lines.append("Итог с доставкой не подтверждён.")
+    if details:
+        for offer in group.offers[:10]:
+            price = _money_minor(offer.price, offer.currency)
+            lines.append(f"• {_html.escape(offer.source)}: {price} · {_html.escape(offer.match_status)}")
+            for conditional in offer.conditional_prices[:2]:
+                lines.append(f"  {_money_minor(conditional.amount, offer.currency)} — {_html.escape(conditional.condition[:100])}")
+    return "\n".join(lines)
+
+
+def _snapshot_text(snapshot) -> str:
+    count = len(snapshot.groups)
+    lines = [f"<b>Поиск: {_html.escape(snapshot.query[:160])}</b>", f"Товаров с точным совпадением: {count}"]
+    if not snapshot.complete:
+        lines.append("⚠️ Сравнение неполное: часть источников или обычных цен недоступна.")
+    status_names = {"pending": "ожидание", "ok": "готово", "partial": "частичные данные", "blocked": "заблокирован",
+                    "timeout": "таймаут", "auth_required": "нужен вход", "rate_limited": "лимит запросов",
+                    "parser_drift": "формат изменился", "unavailable": "недоступен"}
+    for source in snapshot.sources[:12]:
+        lines.append(f"• {_html.escape(source.source)} — {status_names.get(source.status, 'недоступен')}")
+    if not snapshot.groups:
+        lines.append("Точного товара пока нет. Уточните модель и характеристики.")
+    if snapshot.related:
+        lines.append("\nПохожие товары — отдельно, без сравнения цен:")
+        lines.extend(f"• {_html.escape(g.product.title[:100])}" for g in snapshot.related[:5])
+    return "\n".join(lines)
+
+
+async def _run_search(message: Message, user_text: str, *, user_id: int | None = None) -> None:
+    from catalog_v2.models import SearchRequest
+    user_id = user_id if user_id is not None else message.from_user.id
     state = await db.get_session(user_id)
-    progress = await message.answer("🔎 Начинаю поиск…")
-    main_sent = asyncio.Event()
+    progress = await message.answer("🔎 Ищу товар и проверяю предложения…")
     try:
-        async def progress_cb(step: str) -> None:
-            await progress.edit_text(step)
-
-        async def late_cb(products: list[Product]) -> None:
-            # Ozon решил челлендж позже — досылаем его карточки ПОСЛЕ
-            # основного ответа отдельным сообщением, не перебивая его.
-            try:
-                await main_sent.wait()
-                await message.answer("🛒 Тем временем нашлось ещё на Ozon 👇")
-                for p in products:
-                    await _send_card(message, p)
-            except Exception as exc:  # pragma: no cover
-                logger.warning("Поздняя доставка Ozon не удалась: %s", exc)
-
-        outcome = await orch.search_with_constraints(
-            user_id, user_text, state, progress_cb, markets=_markets(state),
-            late_cb=late_cb)
-        await _send_outcome(message, outcome, f"по запросу «{user_text[:40]}»")
-        main_sent.set()
-        await progress.delete()
-    except BudgetExceeded:
-        main_sent.set()
-        info = await llm.budget_info()
-        await progress.edit_text(_budget_text(info))
-    except Exception as exc:  # pragma: no cover
-        main_sent.set()
-        logger.exception("search flow failed")
-        await progress.edit_text(f"Не получилось выполнить поиск: {exc}")
+        snapshot = await _catalog_service().search(user_id, SearchRequest(query=user_text, sources=_markets(state)))
+        state.mode = "search"
+        state.last_query = user_text
+        state.constraints = None
+        state.last_results = [legacy for group in snapshot.groups[:5]
+                              if (legacy := _legacy_catalog_product(group)) is not None]
+        await db.save_session(user_id, state)
+        await progress.edit_text(_snapshot_text(snapshot))
+        for group in snapshot.groups[:5]:
+            await _send_catalog_card(message, group)
+    except Exception:
+        logger.exception("catalog search flow failed")
+        await progress.edit_text("Не получилось выполнить поиск. Попробуйте ещё раз или уточните модель товара.")
 
 
-async def _run_compare(message: Message, text: str) -> None:
-    user_id = message.from_user.id
-    state = await db.get_session(user_id)
-    progress = await message.answer("⚖️ Ищу на обеих площадках…")
-    try:
-        candidates = await orch.search_candidates(text, markets=_markets(state))
-        if not candidates:
-            await progress.edit_text("Не нашёл товаров по этому запросу.")
+async def _send_catalog_card(message: Message, group) -> None:
+    text = _catalog_card_text(group)
+    kb = catalog_product_keyboard(group, legacy_product=_legacy_catalog_product(group))
+    image = group.product.image_url
+    if image and len(text) <= 1024:
+        try:
+            await message.answer_photo(image, caption=text, reply_markup=kb)
             return
-        rows = []
-        for target in candidates[:3]:
-            # одна строка на товар со всеми площадками, где нашёлся тот же товар
-            result = await compare_across_all(llm, target, candidates)
-            if result is not None:
-                rows.append(result)
-        if not rows:
-            await message.answer("⚖️ Тот же товар на другой площадке не найден "
-                                 "(проверьте написание или попробуйте другое название).")
-            await progress.delete()
-            return
-        kb = compare_keyboard(rows[0].ozon_url, rows[0].yandex_url, rows[0].wb_url)
-        await message.answer(_compare_text(rows), reply_markup=kb)
-        await progress.delete()
-    except BudgetExceeded:
-        info = await llm.budget_info()
-        await progress.edit_text(_budget_text(info))
-    except Exception as exc:  # pragma: no cover
-        logger.exception("compare flow failed")
-        await progress.edit_text(f"Не получилось сравнить: {exc}")
+        except Exception:
+            logger.warning("Catalog image unavailable; sending text card")
+    await message.answer(text, reply_markup=kb)
+
+
+async def _run_compare(message: Message, text: str, *, user_id: int | None = None) -> None:
+    await _run_search(message, text, user_id=user_id)
+
+
+def _legacy_catalog_product(group) -> Product | None:
+    offer = next((o for o in group.offers if o.id == group.best_price_offer_id), None)
+    if offer is None or not getattr(offer, "native_id", ""):
+        return None
+    marketplace = {"ozon":"ozon", "yandex":"yandex", "yandex_market":"yandex", "wb":"wb", "wildberries":"wb"}.get(offer.source)
+    if marketplace is None:
+        return None
+    return Product(marketplace=marketplace, ext_id=offer.native_id, title=offer.title,
+                   price=(offer.price or 0) // 100, url=offer.url, photo_url=offer.image_url or "",
+                   rating=offer.rating)
 
 
 async def _freeform(message: Message, question: str, facts: str = "") -> None:
@@ -708,7 +808,7 @@ async def _freeform(message: Message, question: str, facts: str = "") -> None:
 
 # ────────────────────────────── вывод результата ──────────────────
 
-async def _send_outcome(message: Message, outcome: SearchOutcome, label: str) -> None:
+async def _send_outcome(message: Message, outcome: SearchOutcome, label: str, *, user_id: int | None = None) -> None:
     if not outcome.top:
         await message.answer(
             f"По запросу «{label}» ничего не нашлось. Попробуйте другие слова "
@@ -720,11 +820,11 @@ async def _send_outcome(message: Message, outcome: SearchOutcome, label: str) ->
     )
     for p in outcome.top:
         analysis = outcome.analyses.get(p.ext_id)
-        await _send_card(message, p, analysis)
+        await _send_card(message, p, analysis, user_id=user_id)
 
 
 async def _send_card(message: Message, p: Product,
-                     analysis: ReviewAnalysis | None = None) -> None:
+                     analysis: ReviewAnalysis | None = None, *, user_id: int | None = None) -> None:
     # Поисковая выдача не содержит характеристик и фото — обогащаем карточку
     # реальными данными (канал 1) при первом показе.
     if (not config.DEMO_MODE and (not p.photo_url or not p.traits)
@@ -735,7 +835,7 @@ async def _send_card(message: Message, p: Product,
                 p = card
         except Exception as exc:  # pragma: no cover
             logger.warning("Карточка не обогащена: %s", exc)
-    favorites = await db.list_favorites(message.from_user.id)
+    favorites = await db.list_favorites(user_id if user_id is not None else message.from_user.id)
     favored = any(f.ext_id == p.ext_id and f.marketplace == p.marketplace
                   for f in favorites)
     kb = product_card_keyboard(p, favored=favored)
@@ -769,6 +869,8 @@ async def _edit_review_message(message: Message, text: str,
 async def _send_analysis(call: CallbackQuery, product: Product,
                          analysis: ReviewAnalysis, reviews) -> None:
     lines = [_card_text(product, analysis)]
+    if any(r.scope == 'variant_group' for r in reviews):
+        lines.append('⚠️ Отзывы общей карточки могут описывать другие варианты. Требования к выбранной комплектации ими не подтверждаются.')
     kb = reviews_keyboard(product.marketplace, product_ref(product), len(reviews))
     if call.message:
         await _edit_review_message(call.message, "\n".join(lines), kb)
@@ -826,7 +928,7 @@ async def _show_favorites_inline(call: CallbackQuery, user_id: int) -> None:
         call, f"⭐ <b>Избранное</b>: {len(favorites)} товаров",
         reply_markup=home_keyboard())
     for p in favorites[:5]:
-        await _send_card(call.message, p)
+        await _send_card(call.message, p, user_id=user_id)
     if len(favorites) > 5:
         await call.message.answer(
             f"…и ещё {len(favorites) - 5} товаров.",
@@ -839,7 +941,7 @@ async def _set_mode(message: Message, mode: str, reply: str) -> None:
     state = await db.get_session(message.from_user.id)
     state.mode = mode
     await db.save_session(message.from_user.id, state)
-    await message.answer(reply, reply_markup=MENU)
+    await message.answer(reply, reply_markup=ReplyKeyboardRemove())
 
 
 async def _set_mode_from_call(call: CallbackQuery, mode: str, reply: str) -> None:
@@ -867,7 +969,9 @@ async def _edit_or_answer(call: CallbackQuery, text: str,
     try:
         await msg.edit_text(text, reply_markup=reply_markup,
                             disable_web_page_preview=True)
-    except Exception:
+    except Exception as exc:
+        if "message is not modified" in str(exc).lower():
+            return
         await msg.answer(text, reply_markup=reply_markup)
 
 
@@ -1030,6 +1134,20 @@ async def cache_cleanup_loop(db: Database, interval: float = 3600.0) -> None:
             logger.warning("Фоновая очистка кэша не удалась: %s", exc)
 
 
+async def configure_bot_navigation(bot: Bot) -> None:
+    await bot.set_chat_menu_button(menu_button=MenuButtonWebApp(
+        text="MarketFusion AI", web_app=WebAppInfo(url=config.MINIAPP_URL)))
+    commands = {
+        "start": "Начать", "search": "Найти товар", "compare": "Сравнить предложения",
+        "favorites": "Избранное", "settings": "Настройки", "ask": "Вопрос ИИ",
+        "watch": "Выбрать товар для наблюдения", "watches": "Мои наблюдения",
+        "unwatch": "Удалить наблюдение", "history": "История цен товара",
+        "notifications": "Уведомления", "budget": "Бюджет ИИ", "diag": "Диагностика",
+        "reset": "Очистить контекст", "help": "Помощь",
+    }
+    await bot.set_my_commands(commands=[BotCommand(command=key, description=value) for key, value in commands.items()])
+
+
 async def main() -> None:
     if not config.BOT_TOKEN:
         raise SystemExit("SHOPPER_BOT_TOKEN не задан — проверьте .env / start.bat")
@@ -1040,6 +1158,7 @@ async def main() -> None:
     dp.message.middleware(ThrottlingMiddleware())
     dp.message.middleware(LoggingMiddleware())
     dp.callback_query.middleware(ThrottlingMiddleware())
+    dp.callback_query.middleware(LoggingMiddleware())
 
     await db.connect()
     saved_profile = await db.get_setting("profile", config.LLM_PROFILE)
@@ -1060,9 +1179,7 @@ async def main() -> None:
 
     # web_app-кнопка у поля ввода (PRD: «раздаёт кнопку открытия Mini App»)
     try:
-        await bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="🛍 Умный Шоппер",
-                                         web_app=WebAppInfo(url=config.MINIAPP_URL)))
+        await configure_bot_navigation(bot)
         logger.info("Mini App привязан: %s", config.MINIAPP_URL)
     except Exception as exc:  # без прав на изменение меню — не критично
         logger.warning("set_chat_menu_button не удался: %s", exc)

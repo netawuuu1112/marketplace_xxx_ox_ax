@@ -11,3 +11,4 @@ browser-extension/dist-chrome/
 backups/
 *.log
 deployed-version
+.env.v2-staging

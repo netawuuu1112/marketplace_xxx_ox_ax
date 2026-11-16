@@ -155,6 +155,30 @@ def _iter_patches(html: str):
             continue
 
 
+def search_region(html: str) -> tuple[str, str]:
+    """Read the page's selected delivery region; never infer it from IP/query.
+
+    Anonymous live shape: collections.globalDeliveryPoint.GLOBAL_DELIVERY_POINT.
+    Ignore unrelated regions, addresses and analytics values. Conflicting page
+    points make the context unknown rather than selecting an arbitrary city.
+    """
+    found = set()
+    for patch in _iter_patches(html):
+        if not isinstance(patch, dict):
+            continue
+        collections = patch.get('collections')
+        if not isinstance(collections, dict):
+            continue
+        collection = collections.get('globalDeliveryPoint', {})
+        point = collection.get('GLOBAL_DELIVERY_POINT', {}) if isinstance(collection, dict) else {}
+        if not isinstance(point, dict):
+            continue
+        name, identifier = point.get('regionName'), point.get('regionId')
+        if isinstance(name, str) and 0 < len(name.strip()) <= 100 and isinstance(identifier, int) and not isinstance(identifier, bool) and identifier > 0:
+            found.add((' '.join(name.split()), str(identifier)))
+    return next(iter(found)) if len(found) == 1 else ('', '')
+
+
 def _as_dict(value: Any) -> dict[str, Any]:
     """Return ``value`` when it is a dict, else an empty dict.
 
@@ -712,6 +736,7 @@ def parse_search(html: str) -> dict[str, Any]:
         "has_next_page": bool(visible.get("hasNextPage")),
         "items": [],
     }
+    result['region'], result['region_id'] = search_region(html)
 
     if not collections:
         # No collection bundle (the post-2026-09-12 anonymous page): the first

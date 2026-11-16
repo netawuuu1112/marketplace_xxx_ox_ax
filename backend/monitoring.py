@@ -40,12 +40,7 @@ async def create_watch(db, user_id: int, query: str, threshold: float | None,
         raise ValueError("Порог цены должен быть положительным")
     if interval not in ALLOWED_INTERVALS:
         raise ValueError("Недопустимый интервал")
-    row = await db.pool.fetchrow("""
-        INSERT INTO watchlists(user_id,query,threshold_rub,interval_minutes,sources)
-        VALUES($1,$2,$3,$4,$5) RETURNING *
-    """, user_id, query, Decimal(str(threshold)) if threshold is not None else None,
-        interval, sources)
-    return _watch_json(row)
+    raise ValueError("Выберите конкретный товар в поиске V2. Наблюдение по свободному запросу больше не создаётся.")
 
 
 async def delete_watch(db, user_id: int, watch_id: int) -> bool:

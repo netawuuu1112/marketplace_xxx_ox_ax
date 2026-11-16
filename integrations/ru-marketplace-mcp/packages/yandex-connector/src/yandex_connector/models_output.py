@@ -84,6 +84,8 @@ class YandexProduct(BaseModel):
 
 
 class YandexSearchResponse(BaseModel):
+    region: str = Field(default='', description="Actual selected region from the page delivery point; empty when unknown.")
+    region_id: str = Field(default='', description="Actual region identifier from the same page, never a guessed request default.")
     query: str = Field(default="", description="The search query, echoed back from the page.")
     page: int | None = Field(default=None, description="Page number this response covers.")
     page_count: int | None = Field(default=None, description="Total pages available upstream.")

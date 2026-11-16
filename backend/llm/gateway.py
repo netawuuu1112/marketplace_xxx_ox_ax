@@ -57,11 +57,13 @@ TEXT_CHAINS = {
 }
 VISION_CHAINS = {
     "fast": [
+        "aitunnel:gpt-4o-mini",
         "openrouter:google/gemma-4-31b-it:free",
         "openrouter:nvidia/nemotron-nano-12b-v2-vl:free",
         "openrouter:openrouter/free",
     ],
     "quality": [
+        "aitunnel:gpt-4o-mini",
         "openrouter:google/gemma-4-31b-it:free",  # текст+изображения [[9]]
         "openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
         "openrouter:nvidia/nemotron-nano-12b-v2-vl:free",
@@ -209,7 +211,7 @@ class LLMGateway:
                 # потолок соблюдается и внутри вызова: остаток бюджета
                 remaining = deadline - time.monotonic()
                 result = await asyncio.wait_for(
-                    provider.complete(
+                    self._complete_tracked(provider,
                         model=model, kind=kind, prompt=prompt, schema=schema,
                         images=images),
                     timeout=max(0.0, remaining))
@@ -220,6 +222,21 @@ class LLMGateway:
                                model, exc)
         logger.error("Все модели цепочки %s недоступны: %s", chain, last_error)
         raise ProviderError("LLM providers are unavailable") from last_error
+
+    async def _complete_tracked(self, provider, **kwargs):
+        from llm.usage import observer, user_id
+        async def record(name, model, kind, incoming, outgoing):
+            if getattr(self._db, '_pool', None) is None:
+                return
+            try:
+                await self._db.pool.execute('INSERT INTO mf_llm_usage(user_id,task,provider,model,input_tokens,output_tokens) VALUES($1,$2,$3,$4,$5,$6)',user_id.get(),kind,name,model,max(0,incoming),max(0,outgoing))
+            except Exception:
+                logger.warning('Unable to record LLM usage')
+        token=observer.set(record)
+        try:
+            return await provider.complete(**kwargs)
+        finally:
+            observer.reset(token)
 
     async def refresh_from_db(self) -> None:
         """Read admin configuration before a call so all entry points share routing."""

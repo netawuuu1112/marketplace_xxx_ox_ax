@@ -1,12 +1,25 @@
 name: Verify integration
 on:
   pull_request:
-    branches: [develop, main]
+    branches: [develop, main, feature/core-integration]
   workflow_dispatch:
 
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: ci-local-only
+          POSTGRES_DB: marketfusion_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 3s --health-retries 12
+    env:
+      MARKETFUSION_TEST_DATABASE_URL: postgresql://postgres:ci-local-only@127.0.0.1:5432/marketfusion_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,6 +44,20 @@ jobs:
       - run: npm ci
       - run: npm audit --audit-level=high
       - run: npm run build
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install playwright
+      - run: python -m playwright install --with-deps chrome
+      - name: Offline V2 browser scenarios
+        run: |
+          npm run dev -- --host 127.0.0.1 --port 5173 > /tmp/marketfusion-vite.log 2>&1 &
+          trap 'kill $!' EXIT
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:5173/ > /dev/null; then break; fi
+            sleep 1
+          done
+          V2_UI_URL=http://127.0.0.1:5173 python tests/browser_v2.py
   compose:
     runs-on: ubuntu-latest
     steps:
@@ -38,6 +65,19 @@ jobs:
       - run: cp .env.example .env
       - run: docker compose config --quiet
       - run: docker compose -f docker-compose.yml -f docker-compose.browser.yml config --quiet
+      - name: Validate isolated V2 staging
+        env:
+          V2_DB_PASSWORD: ci-placeholder
+          V2_WEB_PASSWORD: ci-placeholder
+          V2_SESSION_SECRET: ci-placeholder
+          V2_ENCRYPTION_KEY: ci-placeholder
+          V2_AGENT_TOKEN: ci-private-agent-placeholder
+          MARKETFUSION_SOURCE_AGENT_TOKEN: ci-private-agent-placeholder
+        run: |
+          docker compose -f docker-compose.v2-staging.yml -f docker-compose.v2-agent.yml --profile agent --profile browser config --quiet
+          docker compose -f docker-compose.yml -f docker-compose.source-agent.yml config --quiet
+          docker compose -f docker-compose.v2-staging.yml --profile agent --profile browser config --format json > compose-agent.json
+          python -c "import json; c=json.load(open('compose-agent.json')); a=c['services']['agent']; assert all(p['host_ip']=='127.0.0.1' for p in a['ports']); assert 'DATABASE_URL' not in a['environment']; assert 'SHOPPER_BOT_TOKEN' not in a['environment']"
       - run: |
           docker compose -f docker-compose.yml -f docker-compose.browser.yml config --format json > compose-browser.json
           python -c "import json; c=json.load(open('compose-browser.json')); assert 'ports' not in c['services']['chrome']; assert c['services']['api']['environment']['CHROME_CDP_HOST']=='chrome'"

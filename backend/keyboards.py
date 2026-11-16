@@ -1,16 +1,11 @@
-"""Клавиатуры бота: inline-главное меню, кнопки карточек, отзывов, сравнения.
-
-UX-карта из PRD (раздел 7): «красивые кнопки» = главное меню + inline-кнопки
-действий на каждой карточке товара. Reply-клавиатура (MENU) остаётся только
-как быстрый ярлык; вся навигация — inline-кнопки с колбэком `menu:*`.
-Каждый экран заканчивается кнопкой «🏠 Главное меню».
-"""
+"""Contextual Telegram actions; the Mini App owns full navigation."""
 from __future__ import annotations
 
 import hashlib
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup, \
-    KeyboardButton, ReplyKeyboardMarkup, WebAppInfo
+    ReplyKeyboardRemove, WebAppInfo
 
 from models import Product
 
@@ -24,45 +19,50 @@ def product_ref(p: Product) -> str:
     return hashlib.blake2s(raw, digest_size=6).hexdigest()
 
 
-def _menu() -> ReplyKeyboardMarkup:
-    """Быстрый ярлык: reply-клавиатура + web_app-кнопка Mini App."""
+# Import compatibility only: never recreate a persistent reply keyboard.
+MENU = ReplyKeyboardRemove()
+
+
+def miniapp_url(**params: str) -> str:
     import config
-    kb = [
-        [KeyboardButton(text="📸 Найти по фото"),
-         KeyboardButton(text="🔎 Умный поиск")],
-        [KeyboardButton(text="⚖️ Сравнить цены"),
-         KeyboardButton(text="⭐ Избранное")],
-        [KeyboardButton(text="⚙️ Настройки")],
-        [KeyboardButton(text="🛍 Mini App",
-                        web_app=WebAppInfo(url=config.MINIAPP_URL))],
-    ]
-    return ReplyKeyboardMarkup(
-        keyboard=kb,
-        resize_keyboard=True,
-        input_field_placeholder="Напишите, что ищете…",
-    )
+    parts = urlsplit(config.MINIAPP_URL)
+    query = dict(parse_qsl(parts.query, keep_blank_values=True))
+    query.update({key: str(value) for key, value in params.items() if value})
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
 
 
-MENU = _menu()
-
-
-def _home_row() -> list[InlineKeyboardButton]:
-    return [InlineKeyboardButton(text="🏠 Главное меню", callback_data=HOME_DATA)]
+def app_keyboard(text: str = "📱 Открыть приложение", **params: str) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=text, web_app=WebAppInfo(url=miniapp_url(**params)))
+    ]])
 
 
 def home_keyboard() -> InlineKeyboardMarkup:
-    """Главное inline-меню: все экраны бота."""
-    kb = [
-        [InlineKeyboardButton(text="🔎 Умный поиск", callback_data="menu:search"),
-         InlineKeyboardButton(text="📸 Найти по фото", callback_data="menu:photo")],
-        [InlineKeyboardButton(text="⚖️ Сравнить цены", callback_data="menu:compare"),
-         InlineKeyboardButton(text="⭐ Избранное", callback_data="menu:favorites")],
-        [InlineKeyboardButton(text="⚙️ Настройки", callback_data="menu:settings"),
-         InlineKeyboardButton(text="🔋 Бюджет", callback_data="menu:budget")],
-        [InlineKeyboardButton(text="🩺 Диагностика", callback_data="menu:diag"),
-         InlineKeyboardButton(text="📖 Помощь", callback_data="menu:help")],
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=kb)
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="🔎 Найти товар", callback_data="menu:search"),
+        InlineKeyboardButton(text="📱 Открыть приложение", web_app=WebAppInfo(url=miniapp_url())),
+    ]])
+
+
+def catalog_product_keyboard(group, *, details: bool = False, legacy_product: Product | None = None) -> InlineKeyboardMarkup:
+    product_id = group.product.id
+    rows = [[
+        InlineKeyboardButton(text="⚖️ Сравнить цены", callback_data=f"v2product:{product_id}"),
+        InlineKeyboardButton(text="🔔 Следить за ценой", callback_data=f"v2watch:{product_id}"),
+    ]]
+    offer = next((o for o in group.offers if o.id == group.best_price_offer_id), None)
+    if offer is None:
+        offer = next((o for o in group.offers if o.match_status == "exact"), None)
+    if offer and offer.url.startswith(("https://", "http://")):
+        rows.append([InlineKeyboardButton(text="🛒 Открыть товар", url=offer.url)])
+    if details:
+        rows.append([InlineKeyboardButton(text="📱 Все предложения", web_app=WebAppInfo(url=miniapp_url(product=product_id))),
+                     InlineKeyboardButton(text="История цен", web_app=WebAppInfo(url=miniapp_url(product=product_id, view="history")))])
+    if legacy_product is not None:
+        ref = product_ref(legacy_product)
+        rows.append([InlineKeyboardButton(text="📝 Отзывы", callback_data=f"reviews:{legacy_product.marketplace}:{ref}"),
+                     InlineKeyboardButton(text="⭐ Избранное", callback_data=f"fav:{legacy_product.marketplace}:{ref}")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
 def product_card_keyboard(p: Product, *, favored: bool = False) -> InlineKeyboardMarkup:
@@ -72,7 +72,7 @@ def product_card_keyboard(p: Product, *, favored: bool = False) -> InlineKeyboar
     kb = [
         [InlineKeyboardButton(text=f"📝 Отзывы ({p.reviews_count})",
                               callback_data=f"reviews:{p.marketplace}:{ref}"),
-         InlineKeyboardButton(text="⚖️ Ozon vs YM",
+         InlineKeyboardButton(text="⚖️ Сравнить цены",
                               callback_data=f"compare:{p.marketplace}:{ref}")],
         [InlineKeyboardButton(text=fav,
                               callback_data=f"fav:{p.marketplace}:{ref}"),
@@ -83,7 +83,6 @@ def product_card_keyboard(p: Product, *, favored: bool = False) -> InlineKeyboar
         [InlineKeyboardButton(text="🛒 Открыть на Яндекс Маркете", url=p.url)]
         if p.marketplace == "yandex" else
         [InlineKeyboardButton(text="🛒 Открыть на Wildberries", url=p.url)],
-        _home_row(),
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
@@ -109,7 +108,6 @@ def reviews_keyboard(market: str, ext_id: str, count: int,
         kb.append(nav)
     kb.append([InlineKeyboardButton(text="← К товару",
                                     callback_data=f"back:{market}:{ext_id}")])
-    kb.append(_home_row())
     return InlineKeyboardMarkup(inline_keyboard=kb)
 
 
@@ -124,7 +122,6 @@ def compare_keyboard(ozon_url: str = "", yandex_url: str = "",
     if wb_url:
         row.append(InlineKeyboardButton(text="🛒 WB", url=wb_url))
     rows = [row] if row else []
-    rows.append(_home_row())
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
 
@@ -145,6 +142,5 @@ def settings_keyboard(*, profile: str, market: str = "both") -> InlineKeyboardMa
          InlineKeyboardButton(text=f"{m_ozon}Ozon", callback_data="set_market:ozon")],
         [InlineKeyboardButton(text=f"{m_ym}Яндекс", callback_data="set_market:yandex"),
          InlineKeyboardButton(text=f"{m_wb}WB", callback_data="set_market:wb")],
-        _home_row(),
     ]
     return InlineKeyboardMarkup(inline_keyboard=kb)

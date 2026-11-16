@@ -39,3 +39,24 @@ def test_database_routes_are_loaded_without_exposing_key(monkeypatch):
         await gateway.aclose()
 
     asyncio.run(check())
+
+
+def test_aitunnel_only_configuration_can_route_vision_without_openrouter(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    from pydantic import BaseModel
+    import config
+    monkeypatch.setattr(config,'DEMO_MODE',False)
+    class Output(BaseModel):
+        item: str
+    async def scenario():
+        database=SimpleNamespace(budget_used=AsyncMock(return_value=0),budget_increment=AsyncMock())
+        gateway=LLMGateway(database,api_key='',mistral_api_key='',local_llm=False)
+        provider=SimpleNamespace(name='aitunnel',complete=AsyncMock(return_value=Output(item='SSD')),aclose=AsyncMock())
+        gateway._providers=[provider];gateway._provider=provider
+        gateway._routes={}
+        result=await gateway.structured(kind='vision',prompt='Identify',schema=Output,images=['data:image/png;base64,fixture'])
+        assert result.item=='SSD'
+        assert provider.complete.call_args.kwargs['model']=='gpt-4o-mini'
+        await gateway.aclose()
+    asyncio.run(scenario())

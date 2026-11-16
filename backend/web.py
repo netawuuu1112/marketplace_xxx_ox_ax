@@ -199,6 +199,7 @@ def _serialize_review(r: Review) -> dict:
         "pros": r.pros or None,
         "cons": r.cons or None,
         "bought_here": r.bought_here,
+        "scope": r.scope,
     }
 
 
@@ -240,7 +241,11 @@ async def handle_reviews(request: web.Request) -> web.Response:
     if product is None:
         product = Product(marketplace=market, ext_id=ext_id,
                           title="", price=0, url="")
-    reviews = await ctx.orch._load_reviews(product)
+    from review.connectors import ReviewsUnavailable
+    try:
+        reviews = await ctx.orch._load_reviews(product, strict=True)
+    except ReviewsUnavailable:
+        return web.json_response({'detail': 'Источник отзывов временно недоступен'}, status=503)
     return web.json_response({"reviews": [_serialize_review(r) for r in reviews]})
 
 
@@ -521,7 +526,7 @@ async def _auth_middleware(request: web.Request, handler):
 def _cors_headers() -> dict:
     return {
         "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
         "Access-Control-Allow-Headers": "X-API-Token, X-Telegram-Init-Data, Content-Type",
     }
 
@@ -538,6 +543,17 @@ async def _cors_preflight(request: web.Request, handler):
     """OPTIONS-preflight: короткий ответ с CORS-заголовками."""
     if request.method == "OPTIONS":
         return web.Response(headers=_cors_headers())
+    if request.method in ('POST','PUT','PATCH','DELETE') and request.cookies.get('mf_session'):
+        origin=request.headers.get('Origin')
+        # Telegram HMAC requests do not depend on browser cookies. Cookie-only
+        # mutations must come from the application's own origin.
+        if origin and parse_init_data(request.headers.get('X-Telegram-Init-Data',''),config.BOT_TOKEN) is None:
+            from urllib.parse import urlsplit
+            allowed={f'{request.scheme}://{request.host}'}
+            configured=urlsplit(config.MINIAPP_URL)
+            if configured.scheme and configured.netloc: allowed.add(f'{configured.scheme}://{configured.netloc}')
+            if origin not in allowed:
+                raise web.HTTPForbidden(text='Недопустимый Origin')
     return await handler(request)
 
 
@@ -561,6 +577,12 @@ async def _error_middleware(request: web.Request, handler):
 async def _timing_middleware(request: web.Request, handler):
     """Замер латентности каждого запроса (метрики ТЗ §5)."""
     t0 = time.monotonic()
+    from llm.usage import user_id as usage_user
+    try:
+        principal = _resolve_user(request)
+    except web.HTTPException:
+        principal = None
+    usage_token = usage_user.set(principal)
     with telemetry.start_span(f"api.request.{request.method}"):
         try:
             return await handler(request)
@@ -568,6 +590,7 @@ async def _timing_middleware(request: web.Request, handler):
             _REQUESTS["total"] += 1
             _LATENCY[request.path].append((time.monotonic() - t0) * 1000.0)
             telemetry.record_duration_ms((time.monotonic() - t0) * 1000.0)
+            usage_user.reset(usage_token)
 
 
 class ApiContext:
@@ -592,6 +615,8 @@ def create_app(ctx: ApiContext) -> web.Application:
                      _timing_middleware])
     app.on_response_prepare.append(_on_prepare_cors)
     app[CTX_KEY] = ctx
+    from catalog_v2.api import register_routes
+    register_routes(app, CTX_KEY, _resolve_user, _require_admin)
     app.router.add_get("/api/search", handle_search)
     app.router.add_post("/api/auth/login", handle_login)
     app.router.add_get("/api/auth/me", handle_me)

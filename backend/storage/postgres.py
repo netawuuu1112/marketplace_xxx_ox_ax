@@ -121,6 +121,8 @@ class PostgresDatabase(Database):
                 CREATE INDEX IF NOT EXISTS idx_audit_events_created
                     ON audit_events(created_at DESC);
                 """)
+                from .migrations import migrate
+                await migrate(conn)
 
     async def close(self) -> None:
         if self._pool is not None:

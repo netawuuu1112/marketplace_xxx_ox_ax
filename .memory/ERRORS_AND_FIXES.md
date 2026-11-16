@@ -1,5 +1,9 @@
 # Errors and fixes
 
+## 2026-11-15 ? V2 independent review regressions
+
+Phone '+' variants, screen protectors, SSD form factors and GPU SUPER suffixes could collapse into exact groups because extraction omitted their distinguishing markers. Added plus normalization, shared connector accessory policy and distinguishing attributes; numeric checksum-valid GTIN queries now carry identity. Stable native offer enrichment changed JSON identity without relational mf_offers product_id/variant_id: upsert now updates both, verified by actual PG old/new product reads. Rolling-window minima retained permanent emitted bounds and lost pending candidates during cooldown: emitted timestamps age bounds once and retain new pending state. Canonical wildberries/yandex_market names were missing legacy bot actions: explicit alias mapping restores them. WB URL resolution now uses the same local/distributed source gates. Regression tests failed before fixes and passed afterward; do not infer untested universal category coverage from these examples.
+
 ## 2026-11-15 — DNS initial 401 and installed connector copies
 
 An initial DNS 401 could be the site's JavaScript browser check, not its final page. Keeping an owned raw-CDP tab alive allowed normal site navigation to finish and exposed 24 products (prices remain absent). Added opt-in DNS-only bounded navigation waiting; unresolved 401/429 and 403 still fail. Temporary probes must set PYTHONPATH when exercising repository-source files: most connector packages in the Docker image are installed copies in site-packages, so copying a file only under /app/integrations does not update runtime imports. Production changes require image replacement.
@@ -27,3 +31,17 @@ Initial private browser connection failed because of container sandbox restricti
 ## 2026-11-14 — Marketplace source limits
 
 Ozon returns HTTP 403 through browser; Avito reports IP firewall; WB DOM search returns cards but only conditional Wallet prices, which compare excludes. Other source outcomes are in `docs/MVP_SOURCE_STATUS_RU.md`. These are open external or parser issues, not fixed by browser startup alone.
+
+
+## 2026-11-16 — Real local integration regressions
+
+SameOrigin PATCH through localNginx8089 returned403: proxy Host $host droppedport. Use $http_host; actual authenticatedOriginPATCH nowpasses. KingstonMPN inlineforms were lost; normalize SNV3S/1000G versusSNV3SM3/1T0 separately. Negatedconditiontext andunknown-conditionAvito couldlowerretailgroups; regression-coveredcondition handling andprobable isolation. Foreign-citycheapoffer wronglyloweredcitysummary; backend/UI exclude confirmed mismatch, testedbrowseranddomain.
+
+YM/WBreviewUI returned[] because Orchestrator used absentWB/no-opYMlegacyadapters. Maintainedconnectors now used withsourcegates; failuresuncached503. InitialstrictYMproductID check rejectedrealSKU->modelfamilyresolution; validate trustedrequestedcardroute andlabelgrouponly. Reviewprompt omittedpros/cons andscope, cachedanalysis ignoredscope, botdeletedonlyscopewarning: nowcontent/scopeversionedprompt/cache, conservative no_dataverdicts andpersistentwarning. Nonemptybutunusablereviewpools also reportunavailable. Tenfocusedregressions passed afterobservedred/greenfixes.
+
+Docker testPGpublishedport changes on restart; discover docker port instead ofhardcoding. Browser V2_UI_URL must pointatlisteningservice(8089used), not stale5175 default. One Windowscurl_cffi selectorwarning useslibraryfallbackthread; tests pass. UTF8PowerShell pipe requires OutputEncoding UTF8 forCyrillicpatches; binarySQLoutput goesdirectfile, notPSredirect.
+
+
+## 2026-11-16 — CI optional profile validation
+
+GitHub run43934115228 Compose step failed: api depends on undefined service agent. The overlay adds a dependency on a profiled service; the config-only command omitted profiles. Reproduced locally with identical command, then enabled --profile agent --profile browser. Both local agent overlay and future production overlay validate. No runtime application change required.

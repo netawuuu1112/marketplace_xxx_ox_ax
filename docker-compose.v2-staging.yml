@@ -1,0 +1,68 @@
+# Isolated local V2 environment. Does not read production .env or run bot polling.
+name: marketfusion-v2-staging
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: marketfusion_v2
+      POSTGRES_USER: marketfusion
+      POSTGRES_PASSWORD: ${V2_DB_PASSWORD:?set staging credentials}
+    volumes: [v2_postgres:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U marketfusion -d marketfusion_v2]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  api:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://marketfusion:${V2_DB_PASSWORD}@db:5432/marketfusion_v2
+      SHOPPER_API_PORT: '8081'
+      SHOPPER_DEMO_MODE: '0'
+      SHOPPER_API_ALLOW_ANON: '0'
+      SHOPPER_SEMANTIC_ENABLED: '0'
+      SHOPPER_LOCAL_LLM: '0'
+      WEB_ADMIN_PASSWORD: ${V2_WEB_PASSWORD:?set staging credentials}
+      WEB_SESSION_SECRET: ${V2_SESSION_SECRET:?set staging credentials}
+      LLM_ENCRYPTION_KEY: ${V2_ENCRYPTION_KEY:?set staging encryption key}
+      WEB_COOKIE_SECURE: '0'
+      CHROME_CDP_HOST: chrome
+    mem_limit: 384m
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build:
+      context: .
+      dockerfile: frontend/web/Dockerfile
+    ports: [127.0.0.1:8089:80]
+    depends_on: [api]
+  chrome:
+    profiles: [browser]
+    build:
+      context: .
+      dockerfile: deployment/chrome/Dockerfile
+    init: true
+    mem_limit: 768m
+    shm_size: 256m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    volumes: [v2_chrome:/home/browser/profile]
+  agent:
+    profiles: [agent]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    command: [python, -m, catalog_v2.source_agent]
+    environment:
+      CHROME_CDP_HOST: chrome
+      MARKETFUSION_SOURCE_AGENT_BIND: '0.0.0.0'
+      MARKETFUSION_SOURCE_AGENT_TOKEN: ${V2_AGENT_TOKEN:-}
+    mem_limit: 384m
+    ports: [127.0.0.1:8092:8092]
+    depends_on: [chrome]
+volumes:
+  v2_postgres:
+  v2_chrome:

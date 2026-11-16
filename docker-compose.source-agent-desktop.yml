@@ -1,0 +1,7 @@
+# Desktop agent only. Does not start or alter a production bot/API/database.
+# Docker Desktop must be running; a powered-off computer cannot provide data.
+services:
+  chrome:
+    restart: unless-stopped
+  agent:
+    restart: unless-stopped

@@ -49,6 +49,7 @@ class Review(BaseModel):
     cons: str = ""
     photos: list[str] = Field(default_factory=list)
     bought_here: bool = False  # «куплен на маркетплейсе»
+    scope: Literal['unknown', 'variant_group'] = 'unknown'
 
 
 class RequirementVerdict(BaseModel):
