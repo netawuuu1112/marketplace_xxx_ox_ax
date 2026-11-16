@@ -40,3 +40,8 @@ SameOrigin PATCH through localNginx8089 returned403: proxy Host $host droppedpor
 YM/WBreviewUI returned[] because Orchestrator used absentWB/no-opYMlegacyadapters. Maintainedconnectors now used withsourcegates; failuresuncached503. InitialstrictYMproductID check rejectedrealSKU->modelfamilyresolution; validate trustedrequestedcardroute andlabelgrouponly. Reviewprompt omittedpros/cons andscope, cachedanalysis ignoredscope, botdeletedonlyscopewarning: nowcontent/scopeversionedprompt/cache, conservative no_dataverdicts andpersistentwarning. Nonemptybutunusablereviewpools also reportunavailable. Tenfocusedregressions passed afterobservedred/greenfixes.
 
 Docker testPGpublishedport changes on restart; discover docker port instead ofhardcoding. Browser V2_UI_URL must pointatlisteningservice(8089used), not stale5175 default. One Windowscurl_cffi selectorwarning useslibraryfallbackthread; tests pass. UTF8PowerShell pipe requires OutputEncoding UTF8 forCyrillicpatches; binarySQLoutput goesdirectfile, notPSredirect.
+
+
+## 2026-11-16 — CI optional profile validation
+
+GitHub run43934115228 Compose step failed: api depends on undefined service agent. The overlay adds a dependency on a profiled service; the config-only command omitted profiles. Reproduced locally with identical command, then enabled --profile agent --profile browser. Both local agent overlay and future production overlay validate. No runtime application change required.

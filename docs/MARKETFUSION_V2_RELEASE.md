@@ -75,6 +75,7 @@ VPS временно недоступны по сообщению владель
 ```powershell
 python deployment/scripts/check_v2_live_flow.py
 python deployment/scripts/check_v2_reviews.py
+python deployment/scripts/check_v2_live_ui.py
 ```
 
 Первый сценарий сохраняет реальные результаты/избранное/watch в отдельной staging-БД и запускает ровно одно измерение выбранного watch, без Telegram send/LLM. Второй читает ограниченную выборку отзывов; статус 503 фиксирует недоступность, не означает пустой пул. Оба обращаются к внешним площадкам. Для smoke без новых внешних запросов использовать check_v2_staging.py.

@@ -35,3 +35,8 @@ Changed `frontend/web/src/App.tsx` and `frontend/web/src/api.ts` to show when a 
 - Added encoded direct search links for each source that failed or returned no ordinary price in the Mini App's marketplace results.
 - Made review loading failure visible and kept comparison loading active until the real API response; comparison failures now appear on the screen.
 - Documented that these client links do not restore automatic price data from blocked sources. Deployment verification is recorded separately in CURRENT_STATE.md.
+
+
+## 2026-11-16 — Final UI proof and CI profile correction
+
+Real staging browser rendered product offers, two measured history points and13 actual YM reviews with permanent scope warning, without intercepted API responses or JS errors; added check_v2_live_ui.py and three live screenshots. GitHub Compose failed because config validation omitted the agent/browser profiles. Reproduced the exact error, added both profiles, and local validation passed. Backend/UI behavior unchanged; full local117 tests and six fixture browser checks remain the verified gates. Final GitHub run pending after push.
