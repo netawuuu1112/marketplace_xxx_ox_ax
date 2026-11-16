@@ -44,3 +44,6 @@
 
 
 Живой интерфейс без перехвата ответов API дополнительно показал предложения товара, две измеренные точки истории и 13 отзывов с предупреждением об общей карточке. Снимки: [предложения](qa/v2-staging-product-live.png), [история](qa/v2-staging-history-live.png), [отзывы](qa/v2-staging-reviews-live.png). Воспроизведение: deployment/scripts/check_v2_live_ui.py после успешного check_v2_live_flow.py.
+
+
+GitHub Actions для проверенного кода `96a48a43ec2146a7d4225f5ee8f32623dc669b34`: [run43934832807](https://github.com/netawuuu1112/marketplace_xxx_ox_ax/actions/runs/43934832807) — все четыре job успешно завершены (backend/PostgreSQL, frontend/browser, Compose, extension). После этого записаны только результаты проверки; это не production deployment.

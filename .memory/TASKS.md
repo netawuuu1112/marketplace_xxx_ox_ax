@@ -36,7 +36,7 @@
 - [x] Connect maintained YM/WB review readers, strict failure status, shared-card scope/analysis constraints, content/scope cache and pros/cons prompt. YM13 live reviews; WB404 still open.
 - [x] Add missing AITunnel vision fallback; routing test only, actual generation remains open.
 - [x] 117Python tests, 6browser fixture scenarios, real staging smoke, builds, npm audit0, nonempty10table restore, independentreview.
-- [ ] Read latest GitHub CI after final continuation push and synchronize PR evidence.
+- [x] Read final code CI at96a48a4: run43934832807 all four jobs passed; synchronize evidence and retain verified source ZIP.
 - [ ] Revisit production only after owner restores servers; no further probes while explicitly unavailable.
 - [ ] Successful WB review read and complete real AI/photo/Telegram event acceptance.
 - [ ] Confirm stable autonomous all-source access under no-spend/no-contact constraints; five sources still blocked.

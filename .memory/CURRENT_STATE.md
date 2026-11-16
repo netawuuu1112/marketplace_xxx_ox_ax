@@ -20,7 +20,7 @@ Maintained YM/WB review readers use shared source gates. Inaccessible/unusable n
 
 Nonempty local backup/restore matched full JSONB fingerprints for10 tables: products32, variants32, offers52, mf_favorites2, search observations52, watches3, watch observations3. This is not a production restore. Local API/agent/Chrome/PG/Web measured about681MiB after a prior search, not full bot/worker load on1GB VPS. Independent review corrections passed; no remaining critical/important findings,10 focused review tests passed.
 
-Commits6dc8602 (source/region/identity) and8f75bb4 (reviews/UI/vision) plus3f012d3 (docs/checks) pushed. GitHub run43934115228 failed Compose validation because the optional profiles were omitted from a config-only command. Exact failure reproduced locally; enabling agent/browser profiles passes. Corrected CI and actual UI evidence are the current final follow-up; final run must be read separately. Prior29cd6f9 had four passing jobs.
+Commits6dc8602 (source/region/identity) and8f75bb4 (reviews/UI/vision) plus3f012d3 (docs/checks) pushed. GitHub run43934115228 failed Compose validation because the optional profiles were omitted from a config-only command. Exact failure reproduced locally; enabling agent/browser profiles passes. Corrected CI and actual UI evidence pushed as96a48a43ec2146a7d4225f5ee8f32623dc669b34. GitHub run43934832807 passed all four jobs: backend/PostgreSQL, frontend/browser, Compose and extension. Code is verified at that SHA; any following commit only records evidence.
 
 ## Remaining and historical production
 
@@ -30,4 +30,4 @@ Last known production Nov15: Russia48.103.149.93 `/opt/marketfusion`, domain mar
 
 Production had YM/WB priced search and real YM worker history; DNS returned cards without prices. Latest SSH banner/HTTPS timed out; owner then confirmed servers unavailable. Read-only production backup failed before SQL/env read, no fresh dump obtained. V2 did not change production application or DB. Stop all VPS calls while unavailable.
 
-Next: finish final CI/PR/package evidence and retain the local reviewable stack. After servers return: fresh backup/restore/load/live acceptance, then separate §14 release permission.
+Checked code archive backups/v2/marketfusion-v2-96a48a4.zip: SHA2563bd928a526b95e5f7660598b8c487a9e83d29b429b520a464f223bf41e9f51d6,1737000bytes. ZIP integrity and tracked-file credential/excluded-file scan passed. Retain this local reviewable stack/package. After servers return: fresh backup/restore/load/live acceptance, then separate §14 release permission.
