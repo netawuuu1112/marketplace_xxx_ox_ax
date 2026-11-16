@@ -6,7 +6,8 @@ Requires Playwright Python and local Chrome: python tests/browser_v2.py
 import json
 import os
 import unittest
-from urllib.parse import urlparse
+import re
+from urllib.parse import urlparse,parse_qs
 
 from playwright.sync_api import sync_playwright, expect
 
@@ -47,6 +48,8 @@ class V2Browser(unittest.TestCase):
         self.page = self.context.new_page()
         self.page.set_default_timeout(4500)
         self.authenticated = True
+        self.profile_region = 'Москва'
+        self.other_region_offer = False
         self.searches = []
         self.cancelled = []
         self.created_watches = []
@@ -73,7 +76,7 @@ class V2Browser(unittest.TestCase):
         elif path == "/api/favorites":
             response = {"products": []}
         elif path == "/api/v2/profile":
-            response = {"region": "Москва"}
+            response = {"region": self.profile_region}
         elif path == "/api/v2/recent":
             response = {"queries": ["Sony WH-1000XM5"], "products": []}
         elif path == "/api/v2/favorites":
@@ -104,6 +107,8 @@ class V2Browser(unittest.TestCase):
             response = {"points": [], "summary": {"min": None, "max": None, "average": None}}
         elif path.startswith("/api/v2/products/"):
             response = group()
+            if self.other_region_offer:
+                response['offers'].append({**response['offers'][0],'id':'other-city','source':'yandex_market','price':100000,'region':'Омск'})
         route.fulfill(status=status, content_type="application/json", body=json.dumps(response))
 
     def snapshot(self, complete):
@@ -136,6 +141,10 @@ class V2Browser(unittest.TestCase):
         expect(self.page.get_by_role("heading", name="Похожие товары")).to_be_visible()
         self.assertEqual("Kingston NV3 1TB", self.searches[0]["query"])
         self.assertNotIn("user_id", self.searches[0])
+        self.page.locator('details.source-chip').filter(has_text='Ozon').locator('summary').click()
+        link=self.page.get_by_role('link',name='Открыть Ozon',exact=True)
+        expect(link).to_be_visible()
+        self.assertEqual('Kingston NV3 1TB',parse_qs(urlparse(link.get_attribute('href')).query)['text'][0])
 
     def test_selected_variant_watch_and_unknown_delivery_not_free(self):
         self.search()
@@ -156,6 +165,20 @@ class V2Browser(unittest.TestCase):
         self.page.get_by_role("button", name="Избранное", exact=True).click()
         self.page.wait_for_timeout(250)
         self.assertIn("search-1", self.cancelled)
+
+    def test_watch_can_use_single_actual_region_when_profile_has_none(self):
+        self.profile_region=''
+        self.search()
+        self.page.get_by_role('button', name='Сравнить Kingston NV3 1TB').click()
+        self.page.get_by_role('button', name='Следить за ценой',exact=True).click()
+        expect(self.page.get_by_label('Регион доставки',exact=True)).to_have_value('Москва')
+
+    def test_known_other_city_offer_does_not_lower_selected_city_summary(self):
+        self.other_region_offer=True
+        self.search()
+        self.page.get_by_role('button',name='Сравнить Kingston NV3 1TB').click()
+        expect(self.page.locator('.price-summary strong').first).to_have_text(re.compile(r'4\s*790'))
+        expect(self.page.get_by_text('Цена для Омск',exact=True)).to_be_visible()
 
 
 if __name__ == "__main__":

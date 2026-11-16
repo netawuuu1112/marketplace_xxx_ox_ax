@@ -57,11 +57,13 @@ TEXT_CHAINS = {
 }
 VISION_CHAINS = {
     "fast": [
+        "aitunnel:gpt-4o-mini",
         "openrouter:google/gemma-4-31b-it:free",
         "openrouter:nvidia/nemotron-nano-12b-v2-vl:free",
         "openrouter:openrouter/free",
     ],
     "quality": [
+        "aitunnel:gpt-4o-mini",
         "openrouter:google/gemma-4-31b-it:free",  # текст+изображения [[9]]
         "openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
         "openrouter:nvidia/nemotron-nano-12b-v2-vl:free",

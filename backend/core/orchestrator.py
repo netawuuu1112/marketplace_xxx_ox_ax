@@ -448,27 +448,40 @@ class Orchestrator:
             self._record_market(adapter.name, "empty")
         return products
 
-    async def _load_reviews(self, p: Product) -> list:
-        cache_key = f"reviews:{p.marketplace}:{p.ext_id}"
+    async def _load_reviews(self, p: Product, *, strict=False) -> list:
+        from review.connectors import connector_reviews, ReviewsUnavailable
+        cache_key = f"reviews:v2:{p.marketplace}:{p.ext_id}"
         cached = await self._db.cache_get_reviews(cache_key)
         if cached is not None:
             return cached
         adapter = next((a for a in self._adapters if a.name == p.marketplace), None)
-        if adapter is None:
-            return []
         try:
-            reviews = await asyncio.wait_for(
-                adapter.get_reviews(p.ext_id, limit=config.REVIEWS_PER_PRODUCT),
-                timeout=config.REVIEWS_FETCH_TIMEOUT_SECONDS,
-            )
+            async def fetch():
+                if not config.DEMO_MODE and p.marketplace in ('yandex', 'wb'):
+                    from catalog_v2.service import get_service
+                    service = get_service(self._db)
+                    async with service.gate, service._source_slot():
+                        return await connector_reviews(p, config.REVIEWS_PER_PRODUCT)
+                if adapter is None:
+                    raise ReviewsUnavailable('No review adapter')
+                return await adapter.get_reviews(p.ext_id, limit=config.REVIEWS_PER_PRODUCT)
+            reviews = await asyncio.wait_for(fetch(), timeout=config.REVIEWS_FETCH_TIMEOUT_SECONDS)
+            if not config.DEMO_MODE and p.marketplace == 'ozon' and not reviews:
+                # This legacy adapter collapses anti-bot failures and true zero
+                # into []; it cannot certify absence of reviews.
+                raise ReviewsUnavailable('Legacy source returned no verified review pool')
         except asyncio.TimeoutError:
             logger.warning(
                 "Отзывы %s/%s не получены за %.1f с; продолжаю без отзывов",
                 p.marketplace, p.ext_id, config.REVIEWS_FETCH_TIMEOUT_SECONDS,
             )
+            if strict:
+                raise ReviewsUnavailable('Review request timed out') from None
             return []
         except Exception as exc:
             logger.warning("Отзывы %s/%s упали: %s", p.marketplace, p.ext_id, exc)
+            if strict:
+                raise ReviewsUnavailable('Review source unavailable') from None
             return []
         await self._db.cache_set_reviews(cache_key, reviews,
                                          config.CACHE_REVIEWS_TTL)

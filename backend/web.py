@@ -199,6 +199,7 @@ def _serialize_review(r: Review) -> dict:
         "pros": r.pros or None,
         "cons": r.cons or None,
         "bought_here": r.bought_here,
+        "scope": r.scope,
     }
 
 
@@ -240,7 +241,11 @@ async def handle_reviews(request: web.Request) -> web.Response:
     if product is None:
         product = Product(marketplace=market, ext_id=ext_id,
                           title="", price=0, url="")
-    reviews = await ctx.orch._load_reviews(product)
+    from review.connectors import ReviewsUnavailable
+    try:
+        reviews = await ctx.orch._load_reviews(product, strict=True)
+    except ReviewsUnavailable:
+        return web.json_response({'detail': 'Источник отзывов временно недоступен'}, status=503)
     return web.json_response({"reviews": [_serialize_review(r) for r in reviews]})
 
 

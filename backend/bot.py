@@ -532,10 +532,17 @@ async def cb_reviews(call: CallbackQuery) -> None:
     requirements = (state.constraints.must_have
                     if state.constraints else [])
     progress = await call.message.answer(f"📖 Читаю отзывы на «{product.title[:40]}…»")
-    reviews = await orch._load_reviews(product)
+    from review.connectors import ReviewsUnavailable
+    try:
+        reviews = await orch._load_reviews(product, strict=True)
+    except ReviewsUnavailable:
+        await progress.edit_text('Источник отзывов временно недоступен. Попробуйте позже или откройте товар на площадке.')
+        return
     if not reviews:
         await progress.edit_text("Отзывов пока нет.")
         return
+    if any(r.scope == 'variant_group' for r in reviews):
+        await progress.edit_text('Отзывы общей карточки могут описывать другие варианты. Анализирую доступные тексты…')
     analysis = await _analyze(product, reviews, requirements)
     await progress.delete()
     await _send_analysis(call, product, analysis, reviews)
@@ -862,6 +869,8 @@ async def _edit_review_message(message: Message, text: str,
 async def _send_analysis(call: CallbackQuery, product: Product,
                          analysis: ReviewAnalysis, reviews) -> None:
     lines = [_card_text(product, analysis)]
+    if any(r.scope == 'variant_group' for r in reviews):
+        lines.append('⚠️ Отзывы общей карточки могут описывать другие варианты. Требования к выбранной комплектации ими не подтверждаются.')
     kb = reviews_keyboard(product.marketplace, product_ref(product), len(reviews))
     if call.message:
         await _edit_review_message(call.message, "\n".join(lines), kb)

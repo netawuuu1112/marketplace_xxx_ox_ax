@@ -17,7 +17,7 @@ export default function WatchEditor({ group, watch, region, onClose, onSaved, on
   const [target, setTarget] = useState(watch?.threshold == null ? "" : String(watch.threshold / 100));
   const [interval, setInterval] = useState(watch?.interval_minutes || 60);
   const [cooldown, setCooldown] = useState(watch?.cooldown_minutes ?? 360);
-  const [watchRegion, setWatchRegion] = useState(watch?.region || region);
+  const [watchRegion, setWatchRegion] = useState(watch?.region || region || ([...new Set(exactOffers.map(offer => offer.region).filter(Boolean))].length === 1 ? exactOffers.find(offer => offer.region)?.region : "") || "");
   const [rules, setRules] = useState<Rules>(watch?.rules || { historical_low: true });
   const [sources, setSources] = useState<string[]>(watch?.sources || []);
   const [busy, setBusy] = useState(false);

@@ -1,3 +1,4 @@
+import { SOURCE_SEARCH, sourceSearchUrl } from "./marketplaceLinks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { request as v2Request } from './v2/api';
 import { comparePrices, createWatch, currentUser, deleteAiProvider, getAdminOverview, getAdminUsers, getAiProviders, getAiRoutes, getAuditEvents, getBudget, getReviews, listFavorites, listNotifications, listWatches, login, myRole, removeWatch, saveAiProvider, saveAiRoute, searchMarketplaces, searchProducts, setAdminUserRole, watchHistory, writeFavorite } from "./api";
@@ -280,27 +281,6 @@ function sourceStatus(source: string, status: string): string {
   return `${name}: поиск пока не выполнен`;
 }
 
-const SOURCE_SEARCH: Record<string, { name: string; base: string; param: string }> = {
-  ozon: { name: "Ozon", base: "https://www.ozon.ru/search/", param: "text" },
-  wildberries: { name: "Wildberries", base: "https://www.wildberries.ru/catalog/0/search.aspx", param: "search" },
-  yandex_market: { name: "Яндекс Маркет", base: "https://market.yandex.ru/search", param: "text" },
-  avito: { name: "Авито", base: "https://www.avito.ru/rossiya", param: "q" },
-  taobao: { name: "Taobao", base: "https://s.taobao.com/search", param: "q" },
-  megamarket: { name: "Мегамаркет", base: "https://megamarket.ru/catalog/?type=products", param: "q" },
-  lamoda: { name: "Lamoda", base: "https://www.lamoda.ru/catalogsearch/result/", param: "q" },
-  dns: { name: "DNS", base: "https://www.dns-shop.ru/search/", param: "q" },
-  citilink: { name: "Ситилинк", base: "https://www.citilink.ru/search/", param: "text" },
-  aliexpress: { name: "AliExpress", base: "https://aliexpress.ru/wholesale", param: "SearchText" },
-};
-
-function sourceSearchUrl(source: string, query: string): string | null {
-  const spec = SOURCE_SEARCH[source];
-  if (!spec) return null;
-  const url = new URL(spec.base);
-  url.searchParams.set(spec.param, query);
-  return url.toString();
-}
-
 function MarketplaceResults({ result, isFav, onFav }: {
   result: MarketplaceSearch;
   isFav: (p: Product) => boolean;
@@ -485,6 +465,7 @@ export function ReviewsScreen({ product: p }: { product: Product }) {
       {!reviews && !error && <p className="hint">Читаю отзывы…</p>}
       {error && <p className="error">{error} <a href={p.url} target="_blank" rel="noopener noreferrer">Открыть товар</a></p>}
       {reviews?.length === 0 && <p className="hint">Отзывов пока нет.</p>}
+      {reviews?.some(r => r.scope === 'variant_group') && <p className="hint">Отзывы относятся к общей карточке товара и могут описывать другие варианты.</p>}
       <div className="review-list">
         {reviews?.map((r) => (
           <button key={r.id} className="review-item" onClick={() => setOpen(r)}>

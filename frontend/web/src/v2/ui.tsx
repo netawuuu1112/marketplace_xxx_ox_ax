@@ -23,7 +23,7 @@ export const sourceName = (source: string) => ({ wildberries: "Wildberries", wb:
 export const money = (amount: number | null | undefined, currency = "RUB") => amount == null ? "Цена неизвестна" : new Intl.NumberFormat("ru-RU", { style: "currency", currency, maximumFractionDigits: amount % 100 ? 2 : 0 }).format(amount / 100);
 export const date = (value?: string | null, time = false) => !value ? "Ещё не проверено" : new Date(value).toLocaleString("ru-RU", { day: "numeric", month: "short", ...(time ? { hour: "2-digit", minute: "2-digit" } : {}) });
 export function confirmedTotal(offer: Offer, region: string): number | null {
-  return offer.price != null && offer.delivery.price != null && offer.delivery.confidence === "confirmed" && offer.delivery.region === region ? offer.price + offer.delivery.price : null;
+  return offer.price != null && (!offer.region || offer.region === region) && offer.delivery.price != null && offer.delivery.confidence === "confirmed" && offer.delivery.region === region ? offer.price + offer.delivery.price : null;
 }
 export function safeUrl(value?: string | null): string | undefined {
   if (!value) return undefined;

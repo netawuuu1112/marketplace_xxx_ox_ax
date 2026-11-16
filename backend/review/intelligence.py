@@ -34,11 +34,16 @@ def build_review_prompt(product: Product, reviews: list[Review],
                           for r in requirements) or "(нет требований)"
     reviews_block = "\n".join(
         f"ОТЗЫВ {i}: [{r.rating}/5] "
-        f"{sanitize_item(r.text, config.REVIEW_TEXT_MAX_CHARS)}"
+        f"{sanitize_item(r.text, config.REVIEW_TEXT_MAX_CHARS)}\n"
+        f"Плюсы: {sanitize_item(r.pros, config.REVIEW_TEXT_MAX_CHARS)}\n"
+        f"Минусы: {sanitize_item(r.cons, config.REVIEW_TEXT_MAX_CHARS)}"
         for i, r in enumerate(reviews, 1)
     )
     return (
         REVIEW_PROMPT
+        + ('\nОБЛАСТЬ ОТЗЫВОВ: общая карточка; отзывы могут описывать другие варианты. '
+           'Суммируй общие мнения, не подтверждай характеристики выбранной комплектации; вердикты no_data.'
+           if any(r.scope == 'variant_group' for r in reviews) else '')
         + f"\n\nТОВАР: {sanitize_item(product.title, 300)}\n"
         + f"ТРЕБОВАНИЯ ПОЛЬЗОВАТЕЛЯ:\n{req_block}\n\n"
         + f"ОТЗЫВЫ:\n{reviews_block}"
@@ -56,8 +61,8 @@ async def analyze_reviews(
     cache_key = None
     if db is not None:
         digest = hashlib.sha256(
-            "\n".join(requirements).encode("utf-8")).hexdigest()[:12]
-        cache_key = f"analysis:{product.marketplace}:{product.ext_id}:{digest}"
+            repr((requirements, [(r.review_id, r.scope, r.text, r.pros, r.cons, r.rating) for r in reviews])).encode("utf-8")).hexdigest()[:16]
+        cache_key = f"analysis:v2:{product.marketplace}:{product.ext_id}:{digest}"
         cached = await db.cache_get(cache_key)
         if cached is not None:
             return ReviewAnalysis.model_validate_json(cached)
@@ -75,6 +80,11 @@ async def analyze_reviews(
                                         schema=ReviewAnalysis)
         analysis.product_market = product.marketplace
         analysis.product_id = product.ext_id
+        if any(r.scope == 'variant_group' for r in reviews):
+            # Shared-card reviews cannot certify this sellable variant, even if
+            # the model ignores the prompt's scope constraint.
+            analysis.verdicts = [RequirementVerdict(requirement=r, verdict='no_data') for r in requirements]
+            analysis.summary = 'Отзывы общей карточки; вариант автора не подтверждён. ' + analysis.summary
 
     if db is not None and cache_key is not None:
         await db.cache_set(cache_key, analysis.model_dump_json(),
