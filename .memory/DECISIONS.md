@@ -32,3 +32,7 @@ Use only semantic source globalDeliveryPoint for YM region, never requestedcity/
 ## 2026-11-16 — Reviews belong to a card family
 
 Maintained YM/WB connectors replace missing/no-op legacyreadpaths while retaining demo/legacyOzon. YMmodelID differsfromrequestedSKU; trustedrequestcardroute identifies the requestedcollection, not independent selectedvariantproof. Mark sharedcard scope, passscope pluspros/cons toanalysis, versioncontent/scope cache and force pooledrequirements no_data. Countedbutinaccessible/unratedpool is unavailable, never zero reviews. Keep finalTelegramwarning. No paidgeneration needed for routing/unit/source-read verification.
+
+## 2026-11-21 — New VPS behind NAT
+
+Run the separately authorized V2 branch on codex-russia with Web bound to loopback and an SSH tunnel for owner access. Keep DNS and the prior VPS out of scope. Require actual inbound HTTPS routing before public exposure and verified unique token consumption before starting the Telegram bot. Use a fresh database until a verified old production archive is available. Record image IDs and SHA alongside a private backup and prove an isolated restore.

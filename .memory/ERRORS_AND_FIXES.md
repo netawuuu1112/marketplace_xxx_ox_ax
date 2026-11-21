@@ -45,3 +45,7 @@ Docker testPGpublishedport changes on restart; discover docker port instead ofha
 ## 2026-11-16 — CI optional profile validation
 
 GitHub run43934115228 Compose step failed: api depends on undefined service agent. The overlay adds a dependency on a profiled service; the config-only command omitted profiles. Reproduced locally with identical command, then enabled --profile agent --profile browser. Both local agent overlay and future production overlay validate. No runtime application change required.
+
+## 2026-11-21 — Non-root CDP proxy unreadable after secure Git checkout
+
+VPS reported Chrome healthy, but API CDP probe failed. Chromium answered on 9223, while Nginx proxy on 9222 had exited because the COPY inherited owner-only permissions from an umask 077 checkout. Set COPY --chmod=0644 for the container's Nginx configuration. Check proxied websocket URL via 9222 in Compose health, so the earlier false positive is visible. Verified Chrome/156 from the API after rebuilding. CDP remains on the Docker network.

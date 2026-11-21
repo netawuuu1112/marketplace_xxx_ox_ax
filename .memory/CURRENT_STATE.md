@@ -1,3 +1,13 @@
+# Current state — 2026-11-21
+
+## New VPS deployment
+
+The owner authorized deployment on the new `codex-russia` VPS only. Ubuntu 24.04.4 amd64, 1 vCPU, 961 MiB RAM, 96 GB disk, 4 GiB swap added. SSH uses remote NAT port 51678; guest address is private. External HTTP requests to 80/443/8080 did not receive the guest test listener's response. DNS pointed to the previous VPS at check time. Access is through the loopback SSH tunnel documented in docs/MARKETFUSION_V2_RUSSIA_VPS.md. No old server was contacted.
+
+Application checked out from GitHub in /opt/marketfusion on deploy/marketfusion-v2-russia. Docker starts at boot. Web/API/PostgreSQL/worker/private Chromium are running with unless-stopped; PostgreSQL and Chromium profile have distinct persistent volumes. Fresh database; old production data was not migrated. Bot still disabled: direct Telegram HTTPS timed out and sole ownership of existing bot token has not been confirmed. No paid AI calls. Phase-specific constraints and historical V2 evidence follow below.
+
+Client browser passed login and navigation to Favorites, Monitoring and Profile over SSH. Authenticated API and anonymous admin denial passed. Chromium proxy initially failed with EACCES due to secure checkout file mode. COPY --chmod=0644 and healthcheck against the proxy on 9222 fixed it; rebuilt and CDP status reachable from API. Repeated real search: Yandex 8 ordinary prices in Moscow; DNS 2 cards without price; WB API403 and browser no tiles, Avito CDP timeout, AliExpress no tiles. Dedicated running worker recorded 1646600 minor units in Moscow history. The new verification watch was retained and paused. The follow-up private archive restored independently with 2 migration records, 4 products and 1 watch. The actual watch observation survived DB restart and authenticated API checks passed again. Ozon and Citilink did not complete browser navigation, Megamarket timed out and Lamoda/Taobao required a challenge. This one VPS check does not replace earlier local five-source proof.
+
 # Current state — 2026-11-16
 
 ## Branch and constraints

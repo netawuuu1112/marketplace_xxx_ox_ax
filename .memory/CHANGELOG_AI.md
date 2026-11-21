@@ -1,5 +1,10 @@
 # AI development changelog
 
+## 2026-11-21 — V2 deployed to the new Russian NAT VPS
+
+Installed Docker/Compose and persistent 4 GiB swap, cloned V2 and published deploy/marketfusion-v2-russia. Started five services with persistent PostgreSQL/Chrome volumes and restart policies. Added check_v2_vps.py, backup_v2_vps.py and a rollback runbook. Fixed non-root CDP config readability and the health check's target after reproducing permission denied; API reached Chrome/156 on 9222 following rebuild. Local TypeScript/Vite passed, Python106 passed and11 skipped without local PG. On VPS: real browser login/navigation, authenticated API, all ten source diagnostics, Moscow worker history at 16466 RUB, verified private restore (2 migrations/4 products/1 watch), and data retained across DB restart. Public ingress, prior data import, Telegram/AI remain open. Other VPS outside scope.
+
+
 ## 2026-11-16 — Real-source acceptance and review integration
 
 Changed catalog_v2 identity/models/sources/service/watches, Yandex/compare DTOs/SSR, private source/remote agent, optional Compose profiles and operator scripts, Nginx/region/watch UI/source navigation, legacy review orchestration/API/bot/analysis, AITunnel visionchain, tests and release/source/README evidence. Actual HTTP search returned YM8/WB15/Avito15/DNS2/AliExpress5 priced cards, sameMPN3source group, actual Moscow watch/worker/history17301RUB. Actual YMreviewendpoint20013texts; WB2nativeIDs404 remains503. Shared-card reviews cannot certify selectedvariant requirements; count>0/no usable text not falseempty.

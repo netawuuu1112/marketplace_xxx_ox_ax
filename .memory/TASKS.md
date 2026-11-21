@@ -7,7 +7,7 @@
 - [x] Implement/test single-message Telegram UX and mobile V2 components.
 - [x] Review integration edges; run isolated staging/empty-schema restore, browser checks and document exact remaining live/load gaps.
 - [x] Commit logical stages, push feature/marketfusion-v2, open draft PR #9 to feature/core-integration; four GitHub CI jobs passed on 5a79c08.
-- [ ] Obtain separate owner permission before any V2 production deployment.
+- [x] Owner explicitly authorized V2 on the new codex-russia VPS on Nov21. Other VPS are out of scope.
 - [ ] Confirm external source/region/delivery support and live end-to-end acceptance separately from fixture checks.
 
 - [x] Deploy private Chromium route and verify CDP from API.
@@ -40,3 +40,13 @@
 - [ ] Revisit production only after owner restores servers; no further probes while explicitly unavailable.
 - [ ] Successful WB review read and complete real AI/photo/Telegram event acceptance.
 - [ ] Confirm stable autonomous all-source access under no-spend/no-contact constraints; five sources still blocked.
+
+## 2026-11-21 VPS deployment
+
+- [x] Install Docker and swap, clone V2 from GitHub in a dedicated checkout, launch persistent Web/API/DB/worker/Chrome.
+- [x] Verify loopback SSH UI, authenticated API, corrected CDP endpoint and one genuine worker price observation.
+- [x] Verify restore in a separate scratch database and keep the private archive.
+- [ ] Obtain usable provider ingress for public HTTPS, then verify Mini App and the existing domain cutover.
+- [ ] Obtain authorized Telegram connectivity and confirm a single consumer before enabling the bot.
+- [ ] Restore historical production data from a verified archive if supplied. No staging dump was used.
+- [ ] Continue source acceptance and actual AI/photo/Telegram alerts per V2.
