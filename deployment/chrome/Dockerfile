@@ -11,7 +11,7 @@ RUN apt-get update \
 RUN mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 
 COPY deployment/chrome/start.sh /usr/local/bin/start-marketfusion-chrome
-COPY deployment/chrome/cdp-nginx.conf /etc/nginx/cdp.conf
+COPY --chmod=0644 deployment/chrome/cdp-nginx.conf /etc/nginx/cdp.conf
 RUN chmod 755 /usr/local/bin/start-marketfusion-chrome
 
 USER browser

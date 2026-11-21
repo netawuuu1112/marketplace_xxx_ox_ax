@@ -14,7 +14,7 @@ services:
     volumes:
       - chrome_profile:/home/browser/profile
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:9223/json/version"]
+      test: ["CMD-SHELL", "curl --fail --silent --max-time 4 http://127.0.0.1:9222/json/version | grep -q 'ws://chrome:9222/devtools/browser/'"]
       interval: 15s
       timeout: 5s
       retries: 8
